@@ -1,0 +1,224 @@
+
+import { PY_INIT, PY_NN_INIT, PY_OPS, PY_RECORDER, PY_TENSOR } from '../lib/python_sources.ts';
+import { countPythonPreambleLines } from '../lib/workerLineMapping.ts';
+
+const USER_CODE_PREAMBLE = `import torchstub
+import torchstub.nn as nn
+import torchstub.nn.functional as F
+from torchstub import Tensor
+import math
+
+`;
+const USER_CODE_PREAMBLE_LINE_COUNT = countPythonPreambleLines(USER_CODE_PREAMBLE);
+
+export function createWorker(): Worker {
+  // We explicitly inline the python sources into the worker script string.
+  // This avoids passing complex objects via postMessage or import issues.
+  const pythonSources = {
+    PY_INIT,
+    PY_NN_INIT,
+    PY_OPS,
+    PY_RECORDER,
+    PY_TENSOR
+  };
+  const pyodideBaseUrl = new URL(import.meta.env.BASE_URL + 'pyodide/', window.location.origin).toString();
+
+  const workerCode = `
+    const pyodideIndexUrl = ${JSON.stringify(pyodideBaseUrl)};
+    let loaded = false;
+    let loadError = null;
+
+    async function loadPyodideScript() {
+      try {
+        importScripts(pyodideIndexUrl + "pyodide.js");
+        if (typeof loadPyodide !== 'undefined') {
+          loaded = true;
+          return;
+        }
+        throw new Error("loadPyodide global is missing after loading local runtime.");
+      } catch (e) {
+        console.warn("Failed to load local Pyodide from " + pyodideIndexUrl, e);
+        loadError = e;
+      }
+    }
+
+    // Wrap execution
+    const pyodideScriptReady = (async function() {
+       await loadPyodideScript();
+    })();
+
+    const PYTHON_SOURCES = ${JSON.stringify(pythonSources)};
+    let pyodide = null;
+
+    async function setupPyodide() {
+      await pyodideScriptReady;
+      if (!loaded) {
+         throw new Error("Could not load local Pyodide runtime from " + pyodideIndexUrl + ". " + (loadError?.message || ""));
+      }
+      
+      if (pyodide) return pyodide;
+      
+      // Explicitly provide indexURL so Pyodide knows where to fetch .wasm files
+      pyodide = await loadPyodide({
+        indexURL: pyodideIndexUrl
+      });
+      
+      // Setup torchstub virtual package
+      pyodide.FS.mkdir('/home/pyodide/torchstub');
+      pyodide.FS.mkdir('/home/pyodide/torchstub/nn');
+      
+      pyodide.FS.writeFile('/home/pyodide/torchstub/__init__.py', PYTHON_SOURCES.PY_INIT);
+      pyodide.FS.writeFile('/home/pyodide/torchstub/tensor.py', PYTHON_SOURCES.PY_TENSOR);
+      pyodide.FS.writeFile('/home/pyodide/torchstub/ops.py', PYTHON_SOURCES.PY_OPS);
+      pyodide.FS.writeFile('/home/pyodide/torchstub/recorder.py', PYTHON_SOURCES.PY_RECORDER);
+      pyodide.FS.writeFile('/home/pyodide/torchstub/nn/__init__.py', PYTHON_SOURCES.PY_NN_INIT);
+      
+      // FIX: Add functional.py by aliasing ops, allowing 'import torchstub.nn.functional as F'
+      pyodide.FS.writeFile('/home/pyodide/torchstub/nn/functional.py', 'from ..ops import *');
+      
+      return pyodide;
+    }
+
+    const pyodideReady = setupPyodide().then((py) => {
+      self.postMessage({ type: 'ready' });
+      return py;
+    });
+    pyodideReady.catch(() => undefined);
+
+    const USER_CODE_PREAMBLE = ${JSON.stringify(USER_CODE_PREAMBLE)};
+    const WRAPPER_LINE_OFFSET = ${USER_CODE_PREAMBLE_LINE_COUNT};
+
+    function toUserLineno(wrappedLine) {
+      return Math.max(1, wrappedLine - WRAPPER_LINE_OFFSET);
+    }
+
+    function parseErrorLineno(msg) {
+      const match = msg.match(/File "<exec>", line (\\d+)/);
+      if (match) {
+        return toUserLineno(parseInt(match[1]));
+      }
+      return 0;
+    }
+
+    function adjustNodeLinenos(nodes, offset) {
+      if (!nodes) return;
+      for (const n of nodes) {
+        if (n.lineno && n.lineno > 0) {
+              n.lineno = Math.max(1, n.lineno - offset);
+        }
+        if (n.children) adjustNodeLinenos(n.children, offset);
+      }
+    }
+
+    const extractionCode = \`
+import json
+import torchstub.recorder
+rec = torchstub.recorder.get_recorder()
+json.dumps(rec.to_dict())
+\`;
+
+    self.onmessage = async (e) => {
+      const { code, inputShape, requestId } = e.data;
+      
+      try {
+        const py = await pyodideReady;
+
+        py.runPython(\`
+import torchstub.recorder
+torchstub.recorder.get_recorder().reset()
+        \`);
+
+        const wrappedCode = \`\${USER_CODE_PREAMBLE}\${code}
+
+if 'model' not in locals():
+    if 'Net' in locals():
+        model = Net()
+    elif 'build_model' in locals():
+        model = build_model()
+    else:
+        raise ValueError("Code must define 'model = ...' or class Net or function build_model()")
+
+input_dims = \${JSON.stringify(inputShape)}
+x = Tensor(input_dims)
+try:
+    model(x)
+except Exception as _tvs_err:
+    import traceback as _tvs_tb
+    _tvs_lineno = 0
+    for _tvs_line in _tvs_tb.format_exc().splitlines():
+        if '<exec>' in _tvs_line and 'line' in _tvs_line:
+            try:
+                _tvs_parts = _tvs_line.split('line ')
+                if len(_tvs_parts) > 1:
+                    _tvs_lineno = int(_tvs_parts[1].split(',')[0].strip())
+            except Exception:
+                pass
+    torchstub.recorder.get_recorder().execution_error = {
+        "message": str(_tvs_err),
+        "lineno": _tvs_lineno,
+        "hint": "Check tensor shapes and dimensions",
+    }
+\`;
+
+        let runError = null;
+        try {
+          py.runPython(wrappedCode);
+        } catch (err) {
+          runError = err;
+        }
+
+        try {
+          const irJson = py.runPython(extractionCode);
+          const data = JSON.parse(irJson);
+          adjustNodeLinenos(data.nodes, WRAPPER_LINE_OFFSET);
+
+          if (data.error) {
+            if (data.error.lineno) {
+              data.error.lineno = toUserLineno(data.error.lineno);
+            }
+            data.error.hint = data.error.hint || "Check tensor shapes";
+          } else if (runError) {
+            const msg = runError.message || "Unknown error";
+            data.error = {
+              message: msg.split('\\n').slice(-2).join('\\n'),
+              lineno: parseErrorLineno(msg),
+              hint: "Check shapes or syntax.",
+            };
+          }
+
+          if (data.error) {
+            self.postMessage({ type: 'partial', data, requestId });
+          } else {
+            self.postMessage({ type: 'success', data, requestId });
+          }
+        } catch (extractErr) {
+          const msg = (runError || extractErr).message || "Unknown error";
+          self.postMessage({
+            type: 'error',
+            requestId,
+            error: {
+              message: msg.split('\\n').slice(-2).join('\\n'),
+              lineno: parseErrorLineno(msg),
+              hint: "Check shapes or syntax. (Network error? " + (!loaded) + ")",
+            },
+          });
+        }
+
+      } catch (err) {
+        const msg = err.message || "Unknown error";
+        self.postMessage({
+          type: 'error',
+          requestId,
+          error: {
+            message: msg.split('\\n').slice(-2).join('\\n'),
+            lineno: parseErrorLineno(msg),
+            hint: "Check shapes or syntax. (Network error? " + (!loaded) + ")",
+          },
+        });
+      }
+    };
+  `;
+
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  return new Worker(URL.createObjectURL(blob));
+}

@@ -1,0 +1,265 @@
+import type React from 'react';
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { type IRGraph, type IRNode, findNodeById } from '../lib/irTypes';
+import { formatNumber } from '../lib/stats';
+import { getVisualMeta } from '../lib/visualKind';
+import { getLayerInsight } from '../lib/layerInsights';
+import { getStrings, type LocalizedStrings } from '../lib/localization';
+import { usePreferencesStore } from '../store/usePreferencesStore';
+
+interface InspectorProps {
+  ir: IRGraph | null;
+  selectedNodeId: string | null;
+  highlightNodeId: string | null;
+  onSelectNode: (id: string) => void;
+  onHighlightNode: (id: string | null) => void;
+  onOpenLayerInsight: (node: IRNode) => void;
+  headerAction?: React.ReactNode;
+}
+
+const SectionCollapseButton: React.FC<{
+  collapsed: boolean;
+  label: string;
+  t: LocalizedStrings;
+  onClick: () => void;
+}> = ({ collapsed, label, t, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={collapsed ? t.inspector.expandSection(label) : t.inspector.collapseSection(label)}
+    aria-label={collapsed ? t.inspector.expandSection(label) : t.inspector.collapseSection(label)}
+    aria-pressed={collapsed}
+    className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--border-subtle)] transition-colors"
+  >
+    <ChevronDown
+      className={`h-3 w-3 transition-transform duration-200 ease-out ${collapsed ? '-rotate-90' : 'rotate-0'}`}
+      strokeWidth={1.8}
+      aria-hidden="true"
+    />
+  </button>
+);
+
+/* ─── Recursive Tree Node ─── */
+const TreeNode: React.FC<{
+  node: IRNode;
+  depth: number;
+  selectedId: string | null;
+  highlightId: string | null;
+  onSelect: (id: string) => void;
+  onHighlight: (id: string | null) => void;
+  onOpenLayerInsight: (node: IRNode) => void;
+  t: LocalizedStrings;
+}> = ({ node, depth, selectedId, highlightId, onSelect, onHighlight, onOpenLayerInsight, t }) => {
+  const [expanded, setExpanded] = useState(depth < 2);
+  const isContainer = node.is_container && node.children && node.children.length > 0;
+  const isSelected = node.id === selectedId;
+  const isHighlighted = node.id === highlightId;
+
+  const indent = depth * 12;
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 py-1 pr-2 cursor-pointer transition-all text-xs select-none border-l-[3px] ${isSelected
+            ? 'bg-[var(--surface-elevated)] border-blue-500 text-[var(--text)] font-semibold'
+            : isHighlighted
+              ? 'bg-[var(--border-subtle)] border-zinc-500 text-[var(--text)]'
+              : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--text)]'
+          }`}
+        style={{ paddingLeft: indent + 8 }}
+        onClick={() => {
+          onSelect(node.id);
+          if (isContainer) setExpanded((v) => !v);
+        }}
+        onMouseEnter={() => onHighlight(node.id)}
+        onMouseLeave={() => onHighlight(null)}
+      >
+        {/* Expand/collapse icon for containers */}
+        {isContainer ? (
+          <span className="w-3 text-[8px] text-zinc-500 flex-shrink-0 text-center">
+            {expanded ? '▼' : '▶'}
+          </span>
+        ) : (
+          <span className="w-3 flex-shrink-0" />
+        )}
+
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: getVisualMeta(node.op_type).color }} />
+
+        <span className="font-medium truncate">{node.op_type}</span>
+
+        {node.params > 0 && (
+          <button
+            type="button"
+            className="ml-auto text-xs text-zinc-500 hover:text-blue-300 font-mono flex-shrink-0 underline underline-offset-4 decoration-dotted"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenLayerInsight(node);
+            }}
+            title={t.inspector.explainParameterFormula}
+          >
+            {formatNumber(node.params)}
+          </button>
+        )}
+      </div>
+
+      {isContainer && expanded && node.children!.map((child) => (
+        <TreeNode
+          key={child.id}
+          node={child}
+          depth={depth + 1}
+          selectedId={selectedId}
+          highlightId={highlightId}
+          onSelect={onSelect}
+          onHighlight={onHighlight}
+          onOpenLayerInsight={onOpenLayerInsight}
+          t={t}
+        />
+      ))}
+    </div>
+  );
+};
+
+/* ─── Node Details Panel ─── */
+const NodeDetails: React.FC<{ node: IRNode; onOpenLayerInsight: (node: IRNode) => void; t: LocalizedStrings }> = ({ node, onOpenLayerInsight, t }) => {
+  const insight = getLayerInsight(node, t);
+  const rows: [string, React.ReactNode][] = [
+    [t.inspector.fields.name, node.name],
+    [t.inspector.fields.type, node.op_type],
+    [t.inspector.fields.line, node.lineno ? String(node.lineno) : '-'],
+    [t.inspector.fields.formula, insight.paramFormula.formula],
+    [t.inspector.fields.calc, insight.paramFormula.calculation],
+  ];
+
+  if (node.meta) {
+    for (const [k, v] of Object.entries(node.meta)) {
+      rows.push([k, Array.isArray(v) ? `(${v.join(', ')})` : String(v)]);
+    }
+  }
+
+  if (node.error) {
+    rows.push([t.inspector.fields.error, node.error]);
+  }
+
+  return (
+    <div className="p-3 space-y-1">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getVisualMeta(node.op_type).color }} />
+        <span className="text-sm font-bold text-[var(--text)] uppercase tracking-wider">{node.op_type}</span>
+        <button
+          type="button"
+          className="ml-auto text-xs font-mono text-blue-300 hover:text-blue-100 underline underline-offset-4 decoration-dotted"
+          onClick={() => onOpenLayerInsight(node)}
+        >
+          {insight.paramsLabel}
+        </button>
+      </div>
+      <div className="bg-[var(--border-subtle)] rounded-lg border border-[var(--border)] overflow-hidden">
+        {rows.map(([label, value], i) => (
+          <div
+            key={label + i}
+            className={`flex items-start gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--surface-elevated)] ${i > 0 ? 'border-t border-[var(--border-subtle)]' : ''}`}
+          >
+            <span className="text-[var(--text-dim)] font-medium w-16 flex-shrink-0 uppercase text-[10px] tracking-wider pt-0.5">{label}</span>
+            <span className={`font-mono ${label === t.inspector.fields.error ? 'text-red-400' : 'text-[var(--text-muted)]'} break-all`}>{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ─── Main Inspector / Model Explorer ─── */
+const Inspector: React.FC<InspectorProps> = ({ ir, selectedNodeId, highlightNodeId, onSelectNode, onHighlightNode, onOpenLayerInsight, headerAction }) => {
+  const language = usePreferencesStore((s) => s.language);
+  const t = getStrings(language);
+  const selectedNode = ir && selectedNodeId ? findNodeById(ir.nodes, selectedNodeId) : null;
+  const [isStructureCollapsed, setStructureCollapsed] = useState(false);
+  const [isDetailsCollapsed, setDetailsCollapsed] = useState(false);
+  const structureFlex = isStructureCollapsed ? '0 0 32px' : isDetailsCollapsed ? '1 1 0' : '6 1 0';
+  const detailsFlex = isDetailsCollapsed ? '0 0 32px' : isStructureCollapsed ? '1 1 0' : '4 1 0';
+
+  return (
+    <div className="h-[calc(100%-16px)] flex flex-col bg-[var(--surface)] text-[var(--text)] glass-panel rounded-l-md border-y-0 border-r-0 overflow-hidden ml-2 my-2 shadow-2xl">
+      {/* Header */}
+      <div className="h-10 border-b border-[var(--border)] flex items-center gap-2 px-4 shrink-0 bg-[var(--surface-elevated)] select-none">
+        <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider">
+          {t.app.explorer}
+        </span>
+        {headerAction && <div className="ml-auto">{headerAction}</div>}
+      </div>
+
+      {!ir ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-dim)] p-4">
+          <span className="text-sm">{t.inspector.noModelLoaded}</span>
+          <span className="text-[11px] mt-1.5 opacity-80">{t.inspector.runCodeToExplore}</span>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* ─── Top: Structure Tree (60%) ─── */}
+          <div
+            data-tour="structure"
+            className="min-h-0 flex flex-col transition-[flex] duration-200 ease-out"
+            style={{ flex: structureFlex }}
+          >
+            <div className="h-8 border-b border-[var(--border)] flex items-center px-2 pr-4 shrink-0 select-none">
+              <SectionCollapseButton
+                collapsed={isStructureCollapsed}
+                label={t.inspector.structure}
+                t={t}
+                onClick={() => setStructureCollapsed((v) => !v)}
+              />
+              <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider">{t.inspector.structure}</span>
+              <span className="ml-auto text-[10px] font-mono text-[var(--text-muted)] bg-[var(--surface-elevated)] px-2 py-0.5 rounded-full border border-[var(--border-subtle)]">
+                {formatNumber(ir.stats.total_params)} {t.inspector.params}
+              </span>
+            </div>
+            <div className={`flex-1 overflow-y-auto custom-scrollbar py-2 transition-[opacity,transform] duration-200 ease-out ${isStructureCollapsed ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100 translate-y-0 delay-75'}`}>
+              {ir.nodes.map((node) => (
+                <TreeNode
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  selectedId={selectedNodeId}
+                  highlightId={highlightNodeId}
+                  onSelect={onSelectNode}
+                  onHighlight={onHighlightNode}
+                  onOpenLayerInsight={onOpenLayerInsight}
+                  t={t}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* ─── Bottom: Node Details (40%) ─── */}
+          <div
+            data-tour="details"
+            className="min-h-0 border-t border-[var(--border)] flex flex-col bg-[var(--surface-elevated)] transition-[flex] duration-200 ease-out"
+            style={{ flex: detailsFlex }}
+          >
+            <div className="h-8 border-b border-[var(--border-subtle)] flex items-center px-2 pr-4 shrink-0 select-none">
+              <SectionCollapseButton
+                collapsed={isDetailsCollapsed}
+                label={t.inspector.details}
+                t={t}
+                onClick={() => setDetailsCollapsed((v) => !v)}
+              />
+              <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider">{t.inspector.details}</span>
+            </div>
+            <div className={`flex-1 overflow-y-auto custom-scrollbar transition-[opacity,transform] duration-200 ease-out ${isDetailsCollapsed ? 'opacity-0 translate-y-1 pointer-events-none' : 'opacity-100 translate-y-0 delay-75'}`}>
+              {selectedNode ? (
+                <NodeDetails node={selectedNode} onOpenLayerInsight={onOpenLayerInsight} t={t} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-[var(--text-dim)] text-xs italic">
+                  {t.inspector.clickNodeToInspect}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Inspector;

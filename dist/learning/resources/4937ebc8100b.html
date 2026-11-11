@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chain rule từng bước — sơ đồ tính toán và lan truyền ngược</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#d9e0e4; --paper-2:#e9eef0; --white:#fafcfc;
+  --ink:#15242e; --ink-70:#4a5e6a; --ink-40:#8496a1;
+  --rule:#b9c6cd; --rule-soft:#cdd7dc;
+  --signal:#c0143c; --signal-soft:rgba(192,20,60,.12);
+  --data:#1d4c6b; --good:#0f7355;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--sans);color:var(--ink);font-size:15px;line-height:1.55;
+  background-color:var(--paper);
+  background-image:linear-gradient(to right,rgba(21,36,46,.045) 1px,transparent 1px),
+                   linear-gradient(to bottom,rgba(21,36,46,.045) 1px,transparent 1px);
+  background-size:28px 28px}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+p{margin:0}
+code{font-family:var(--mono)}
+
+.top{border-bottom:1px solid var(--rule);padding:22px 26px 18px;
+  background:linear-gradient(to bottom,rgba(250,252,252,.92),rgba(250,252,252,.4))}
+.top-in{max-width:1560px;margin:0 auto}
+h1{font-size:clamp(23px,2.7vw,33px)}
+.sub{color:var(--ink-70);font-weight:300;max-width:74ch;margin-top:7px;font-size:14.5px}
+
+.bar{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--rule);
+  background:rgba(233,238,240,.96);backdrop-filter:blur(6px)}
+.bar-in{max-width:1560px;margin:0 auto;padding:10px 26px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+button.btn{all:unset;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:600;
+  padding:7px 14px;border:1px solid var(--ink);border-radius:3px;color:var(--ink);transition:background .12s,color .12s}
+button.btn:hover{background:var(--ink);color:var(--white)}
+button.btn.solid{background:var(--ink);color:var(--white)}
+button.btn.solid:hover{background:var(--signal);border-color:var(--signal)}
+button.btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+button.btn[disabled]{opacity:.32;cursor:not-allowed;background:transparent;color:var(--ink)}
+.sep{width:1px;height:26px;background:var(--rule)}
+label.fld{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-70)}
+select{font-family:var(--sans);font-size:13px;padding:5px 7px;border:1px solid var(--rule);
+  border-radius:3px;background:var(--white);color:var(--ink);cursor:pointer;max-width:270px}
+select:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+.state{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12.5px}
+.tagx{border:1px solid var(--rule);background:var(--white);padding:4px 10px;border-radius:99px;color:var(--ink-70)}
+.tagx b{color:var(--ink);font-weight:600}
+.tagx.fw{border-color:var(--ink);color:var(--ink)}
+.tagx.bw{border-color:var(--signal);color:var(--signal);background:var(--signal-soft)}
+.tagx.fin{border-color:rgba(15,115,85,.5);color:var(--good);background:rgba(15,115,85,.08)}
+
+.wrap{max-width:1560px;margin:0 auto;padding:16px 26px 50px;display:flex;flex-direction:column;gap:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 404px;gap:14px;align-items:start}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+.card{background:var(--white);border:1px solid var(--rule);border-radius:3px;min-width:0}
+.hd{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between;align-items:baseline;
+  padding:9px 14px;border-bottom:1px solid var(--rule-soft);font-size:13px;font-weight:600}
+.hd span{font-weight:400;font-size:12px;color:var(--ink-40);font-family:var(--mono)}
+
+/* ---- sơ đồ ---- */
+.gbox{padding:6px 10px 2px;overflow-x:auto}
+.gbox svg{display:block;width:100%;min-width:680px;height:auto}
+.nd .shape{fill:var(--white);stroke:var(--rule);stroke-width:1.4;transition:fill .15s,stroke .15s}
+.nd .nm{fill:var(--ink);font:600 12px var(--sans)}
+.nd .vl{fill:var(--ink-40);font:600 12.5px var(--mono)}
+.nd .gr{fill:var(--signal);font:500 11px var(--mono);opacity:0}
+.nd.on .shape{fill:#eef2f4}
+.nd.on .vl{fill:var(--ink)}
+.nd.grad .gr{opacity:1}
+.nd.leaf .shape{stroke-dasharray:none}
+.nd.act .shape{fill:var(--ink);stroke:var(--ink);stroke-width:2}
+.nd.act .nm,.nd.act .vl{fill:var(--white)}
+.nd.act .gr{fill:#ff8fab}
+.nd.actb .shape{fill:var(--white);stroke:var(--signal);stroke-width:2.6}
+.nd.done .shape{fill:#eef2f4}
+.nd.fin .shape{stroke:var(--signal);stroke-width:2}
+.nd{cursor:pointer}
+.ef{fill:none;stroke:var(--rule);stroke-width:1.5}
+.ef.on{stroke:var(--ink-40)}
+.eb{fill:none;stroke:var(--signal);stroke-width:1.6;stroke-dasharray:5 3;opacity:0}
+.eb.on{opacity:1}
+.el{fill:var(--signal);font:500 10.5px var(--mono);opacity:0;paint-order:stroke;stroke:var(--white);stroke-width:3px}
+.el.on{opacity:1}
+.band{fill:var(--ink-40);font:400 11px var(--sans)}
+.band.bw{fill:var(--signal)}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;padding:2px 16px 10px;font-size:12px;color:var(--ink-70)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;border:1.4px solid var(--rule);
+  background:var(--white);vertical-align:-1px;margin-right:6px}
+.legend i.g{border-color:var(--signal);border-style:dashed;background:var(--signal-soft)}
+.legend i.k{background:var(--ink);border-color:var(--ink)}
+
+/* ---- thanh trượt đầu vào ---- */
+.inp{display:flex;flex-wrap:wrap;gap:10px 20px;padding:11px 16px;border-top:1px solid var(--rule-soft)}
+.sl{display:flex;flex-direction:column;gap:1px;min-width:150px;flex:1}
+.sl-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--ink-70)}
+.sl-head b{font-family:var(--mono);font-size:13px;color:var(--ink)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;cursor:pointer;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--rule);border-radius:2px}
+input[type=range]::-moz-range-track{height:3px;background:var(--rule);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--signal);border:2px solid var(--white);margin-top:-5.5px;box-shadow:0 0 0 1px var(--signal)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--signal);border:2px solid var(--white)}
+input[type=range]:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:3px}
+
+/* ---- bảng giải thích ---- */
+.stp{padding:13px 16px 16px}
+.kick{font-family:var(--mono);font-size:11.5px;color:var(--signal);margin-bottom:5px}
+.stp h2{font-size:18px;margin-bottom:8px}
+.why{color:var(--ink-70);font-size:14px;margin-bottom:12px}
+.fm{background:var(--paper-2);border:1px solid var(--rule-soft);border-radius:3px;
+  padding:11px 13px;font-family:var(--mono);font-size:13px;line-height:1.95;overflow-x:auto;margin-bottom:10px}
+.fm .lb{color:var(--ink-40)}
+.fm .hi{color:var(--signal);font-weight:600}
+.fm .gk{color:var(--good);font-weight:600}
+.fm+.fm{margin-top:-2px}
+.tip{border-left:3px solid var(--rule);padding:2px 0 2px 12px;font-size:13px;color:var(--ink-70)}
+.tip b{color:var(--ink)}
+
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+th{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--ink-40);text-align:right;
+  padding:6px 10px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{text-align:right;padding:5px 10px;border-bottom:1px solid var(--rule-soft);color:var(--ink-70);white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+td.na{color:#c3ced4}
+td.new{background:var(--signal-soft);color:var(--ink)}
+td.leafrow{font-weight:600}
+tr.leaf td:first-child{color:var(--signal);font-weight:600}
+.tb{overflow-x:auto}
+.ok{color:var(--good)}
+.small{font-size:11.5px;color:var(--ink-40);padding:8px 14px 12px;font-family:var(--sans)}
+
+.foot{max-width:1560px;margin:0 auto;padding:0 26px 40px;color:var(--ink-40);font-size:12.5px}
+kbd{font-family:var(--mono);font-size:11.5px;border:1px solid var(--rule);border-bottom-width:2px;
+  border-radius:3px;padding:1px 5px;color:var(--ink-70);background:var(--white)}
+
+@media (max-width:1180px){
+  .grid{grid-template-columns:1fr}
+  .grid2{grid-template-columns:1fr}
+}
+@media (max-width:700px){
+  .top,.bar-in,.wrap,.foot{padding-left:14px;padding-right:14px}
+  .state{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <h1>Chain rule, chạy từng bước trên sơ đồ tính toán</h1>
+    <p class="sub">Đạo hàm của hàm hợp không tính một phát ra ngay. Nó đi ngược từ đầu ra về từng biến, mỗi lần qua một nút thì nhân thêm một đạo hàm địa phương. Bấm từng bước để xem phép nhân đó xảy ra ở đâu, với con số nào.</p>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="bar-in">
+    <button class="btn solid" id="bNext">Bước tiếp</button>
+    <button class="btn" id="bPrev">Lùi</button>
+    <button class="btn" id="bRun">Chạy</button>
+    <button class="btn" id="bAll">Tới kết quả</button>
+    <button class="btn" id="bReset">Đặt lại</button>
+    <div class="sep"></div>
+    <label class="fld">ví dụ <select id="selEx"></select></label>
+    <label class="fld">tốc độ
+      <select id="selS">
+        <option value="1400">chậm</option>
+        <option value="850" selected>vừa</option>
+        <option value="380">nhanh</option>
+      </select>
+    </label>
+    <div class="state">
+      <span class="tagx" id="tgPhase">giai đoạn: <b>—</b></span>
+      <span class="tagx" id="tgStep">bước <b>0</b>/0</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="card">
+      <div class="hd"><span id="hdF" style="font-family:var(--mono);font-size:13.5px;color:var(--ink);font-weight:600">—</span><span>bấm vào một nút để nhảy tới bước của nút đó</span></div>
+      <div class="gbox" id="gbox"></div>
+      <div class="legend">
+        <span><i class="k"></i>nút đang xử lý</span>
+        <span><i></i>giá trị xuôi</span>
+        <span><i class="g"></i>gradient đi ngược, nhãn trên cạnh là số nhân thêm</span>
+      </div>
+      <div class="inp" id="inp"></div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Bước hiện tại<span id="hdS">—</span></div>
+      <div class="stp" id="stp"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="hd">Bảng các nút<span>giá trị xuôi và đạo hàm ngược</span></div>
+      <div class="tb"><table id="tab"></table></div>
+    </div>
+    <div class="card">
+      <div class="hd">Kết quả và kiểm chứng<span>so với sai phân trung tâm</span></div>
+      <div class="tb"><table id="chk"></table></div>
+      <p class="small" id="chkNote"></p>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  <kbd>→</kbd> bước tiếp, <kbd>←</kbd> lùi, <kbd>Space</kbd> chạy hoặc dừng, <kbd>R</kbd> đặt lại.
+  Mọi con số trên trang đều tính trực tiếp từ sơ đồ, không có giá trị nào viết sẵn.
+</footer>
+
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i);};
+
+/* ===================== PHÉP TOÁN VÀ ĐẠO HÀM ĐỊA PHƯƠNG ===================== */
+var OPS={
+ mul:{ sym:function(n){return n[0]+' · '+n[1];},
+       f:function(v){return v[0]*v[1];},
+       d:function(v){return [v[1],v[0]];},
+       ds:function(n){return [n[1],n[0]];} },
+ add:{ sym:function(n){return n[0]+' + '+n[1];},
+       f:function(v){return v[0]+v[1];},
+       d:function(){return [1,1];},
+       ds:function(){return ['1','1'];} },
+ sub:{ sym:function(n){return n[0]+' − '+n[1];},
+       f:function(v){return v[0]-v[1];},
+       d:function(){return [1,-1];},
+       ds:function(){return ['1','−1'];} },
+ addc:{sym:function(n,c){return n[0]+' + '+c;},
+       f:function(v,c){return v[0]+c;},
+       d:function(){return [1];},
+       ds:function(){return ['1'];} },
+ sq:{  sym:function(n){return n[0]+'²';},
+       f:function(v){return v[0]*v[0];},
+       d:function(v){return [2*v[0]];},
+       ds:function(n){return ['2'+n[0]];} },
+ sin:{ sym:function(n){return 'sin('+n[0]+')';},
+       f:function(v){return Math.sin(v[0]);},
+       d:function(v){return [Math.cos(v[0])];},
+       ds:function(n){return ['cos('+n[0]+')'];} },
+ sig:{ sym:function(n){return 'σ('+n[0]+')';},
+       f:function(v){return 1/(1+Math.exp(-v[0]));},
+       d:function(v,o){return [o*(1-o)];},
+       ds:function(n,o){return [o+'(1 − '+o+')'];} }
+};
+
+/* ===================== CÁC VÍ DỤ ===================== */
+var EXS=[
+{ ten:'Hàm hợp cơ bản:  f = sin(x² + 1)',
+  ct:'f(x) = sin(x² + 1)',
+  giai:'df/dx = cos(x² + 1) · 2x',
+  y:'f', vb:[740,296],
+  leaves:[{id:'x',v:1.20,min:-3,max:3,st:0.05,x:80,y:150}],
+  nodes:[{id:'u',op:'sq',  in:['x'],x:270,y:150},
+         {id:'v',op:'addc',in:['u'],c:1,x:460,y:150},
+         {id:'f',op:'sin', in:['v'],x:650,y:150}],
+  mo:'Chuỗi ba phép toán nối tiếp. Gradient đi ngược qua đúng ba lần nhân.' },
+
+{ ten:'Một biến đi theo hai đường:  f = x² · sin(x)',
+  ct:'f(x) = x² · sin(x)',
+  giai:'df/dx = 2x·sin(x) + x²·cos(x)',
+  y:'f', vb:[860,344],
+  leaves:[{id:'x',v:1.20,min:-3,max:3,st:0.05,x:110,y:172}],
+  nodes:[{id:'u',op:'sq', in:['x'],x:420,y:92},
+         {id:'s',op:'sin',in:['x'],x:420,y:252},
+         {id:'f',op:'mul',in:['u','s'],x:740,y:172}],
+  mo:'x xuất hiện ở hai nhánh. Gradient về x là tổng đóng góp của cả hai đường đi — đây là chỗ hay quên nhất.' },
+
+{ ten:'Mất mát hồi quy tuyến tính:  L = (w·x + b − y)²',
+  ct:'L = (w · x + b − y)²',
+  giai:'∂L/∂w = 2(ŷ − y)·x<br>∂L/∂b = 2(ŷ − y)',
+  y:'L', vb:[1000,400],
+  leaves:[{id:'w',v:5.00,min:0,max:12,st:0.1,x:85,y:90},
+          {id:'x',v:0.65,min:0.1,max:2,st:0.05,x:85,y:190},
+          {id:'b',v:1.00,min:-3,max:5,st:0.1,x:300,y:320},
+          {id:'y',v:5.60,min:1,max:13,st:0.1,x:520,y:350}],
+  nodes:[{id:'u',op:'mul',in:['w','x'],x:300,y:140},
+         {id:'z',op:'add',in:['u','b'],x:520,y:215},
+         {id:'e',op:'sub',in:['z','y'],x:740,y:270},
+         {id:'L',op:'sq', in:['e'],x:930,y:270}],
+  mo:'Đây chính là đồ thị mà loss.backward() đi ngược. Hai số cuối cùng ở w và b là gradient dùng để cập nhật tham số.' },
+
+{ ten:'Một nơ-ron sigmoid:  L = (σ(w·x + b) − y)²',
+  ct:'L = (σ(w · x + b) − y)²',
+  giai:'∂L/∂w = 2(a − y)·a(1 − a)·x',
+  y:'L', vb:[1120,448],
+  leaves:[{id:'w',v:1.50,min:-4,max:4,st:0.05,x:75,y:85},
+          {id:'x',v:0.80,min:-3,max:3,st:0.05,x:75,y:185},
+          {id:'b',v:-0.40,min:-3,max:3,st:0.05,x:265,y:330},
+          {id:'y',v:1.00,min:0,max:1,st:0.05,x:645,y:385}],
+  nodes:[{id:'u',op:'mul',in:['w','x'],x:265,y:135},
+         {id:'z',op:'add',in:['u','b'],x:455,y:215},
+         {id:'a',op:'sig',in:['z'],x:645,y:215},
+         {id:'e',op:'sub',in:['a','y'],x:835,y:298},
+         {id:'L',op:'sq', in:['e'],x:1030,y:298}],
+  mo:'Thêm một hàm phi tuyến. Đạo hàm địa phương của sigmoid là a(1 − a), tính lại từ chính giá trị đầu ra nên rất rẻ.' }
+];
+
+/* ===================== TRẠNG THÁI ===================== */
+var cur=0, ex, V, LOC, steps=[], k=0, timer=null, running=false, speed=850;
+var NW=132, LW=118, NH=58;
+
+function fm(v){
+  if(v===null||v===undefined)return '—';
+  if(!isFinite(v))return '∞';
+  if(v!==0&&(Math.abs(v)>=1e5||Math.abs(v)<1e-4))return v.toExponential(2);
+  return v.toFixed(4);
+}
+function sg(v){return (v<0?'−':'')+fm(Math.abs(v));}
+function cp(o){var r={},i;for(i in o)r[i]=o[i];return r;}
+function nodeOf(id){
+  var i;
+  for(i=0;i<ex.nodes.length;i++) if(ex.nodes[i].id===id) return ex.nodes[i];
+  for(i=0;i<ex.leaves.length;i++) if(ex.leaves[i].id===id) return ex.leaves[i];
+  return null;
+}
+function isLeaf(id){return !!ex.leaves.filter(function(l){return l.id===id;})[0];}
+function lbl(n){return n.id+' = '+OPS[n.op].sym(n.in,n.c);}
+
+/* ===================== TÍNH TOÁN ===================== */
+function evalAll(ovr){
+  var VV={},i,n;
+  for(i=0;i<ex.leaves.length;i++){var l=ex.leaves[i];VV[l.id]=(ovr&&ovr[l.id]!==undefined)?ovr[l.id]:l.v;}
+  for(i=0;i<ex.nodes.length;i++){n=ex.nodes[i];
+    VV[n.id]=OPS[n.op].f(n.in.map(function(p){return VV[p];}),n.c);}
+  return VV;
+}
+function numDeriv(id){
+  var h=1e-5,o1={},o2={},base=nodeOf(id).v;
+  o1[id]=base+h;o2[id]=base-h;
+  return (evalAll(o1)[ex.y]-evalAll(o2)[ex.y])/(2*h);
+}
+
+function build(){
+  ex=EXS[cur];
+  V=evalAll(null);
+  LOC={};
+  ex.nodes.forEach(function(n){
+    var iv=n.in.map(function(p){return V[p];});
+    var dv=OPS[n.op].d(iv,V[n.id]), dsy=OPS[n.op].ds(n.in,n.id);
+    LOC[n.id]=n.in.map(function(p,j){return {p:p,val:dv[j],sym:dsy[j]};});
+  });
+  /* ai dùng nút nào */
+  var users={};
+  ex.nodes.forEach(function(n){n.in.forEach(function(p){(users[p]=users[p]||[]).push(n.id);});});
+
+  steps=[];
+  var shown={},grads={},edges={},fin={},donebw={};
+  ex.leaves.forEach(function(l){shown[l.id]=1;});
+  steps.push({kind:'init',shown:cp(shown),grads:{},edges:{},fin:{},
+    tt:'Gán giá trị đầu vào',
+    why:'Mỗi ô tròn là một biến, mỗi ô vuông là một phép toán. Đầu tiên ta thả số vào các biến rồi đi xuôi từ trái sang phải.',
+    fm:[ex.leaves.map(function(l){return l.id+' = '+fm(l.v);}).join('     ')],
+    tip:ex.mo});
+
+  ex.nodes.forEach(function(n){
+    shown[n.id]=1;
+    var iv=n.in.map(function(p){return fm(V[p]);});
+    steps.push({kind:'fwd',node:n.id,shown:cp(shown),grads:{},edges:{},fin:{},
+      tt:'Lan truyền xuôi — tính '+n.id,
+      why:'Nút này gom giá trị từ các mũi tên đi vào, áp dụng phép toán của nó rồi đẩy kết quả sang phải.',
+      fm:[n.id+' = '+OPS[n.op].sym(n.in,n.c),
+          n.id+' = '+OPS[n.op].sym(iv,n.c),
+          '<b>'+n.id+' = '+fm(V[n.id])+'</b>']});
+  });
+
+  grads[ex.y]=1;
+  steps.push({kind:'seed',shown:cp(shown),grads:cp(grads),edges:{},fin:{},
+    tt:'Hạt giống của lan truyền ngược',
+    why:'Đổi chiều. Ta muốn biết mỗi biến ảnh hưởng tới '+ex.y+' mạnh cỡ nào, nên bắt đầu từ đạo hàm của '+ex.y+' theo chính nó.',
+    fm:['∂'+ex.y+'/∂'+ex.y+' = <b>1</b>',
+        '<i>mọi gradient phía sau đều là số 1 này nhân dần với các đạo hàm địa phương</i>']});
+
+  for(var i=ex.nodes.length-1;i>=0;i--){
+    var n=ex.nodes[i], gv=grads[n.id]||0, lines=[], tips=[];
+    LOC[n.id].forEach(function(L){
+      var contrib=gv*L.val, had=(grads[L.p]!==undefined), old=grads[L.p]||0;
+      grads[L.p]=old+contrib;
+      edges[n.id+'>'+L.p]=1;
+      lines.push('∂'+ex.y+'/∂'+L.p+' = ∂'+ex.y+'/∂'+n.id+' · ∂'+n.id+'/∂'+L.p);
+      lines.push('<span class="lb">∂'+n.id+'/∂'+L.p+' = '+L.sym+' = '+sg(L.val)+'</span>');
+      if(had){
+        lines.push('<span class="lb">đường này góp</span> '+sg(gv)+' × '+sg(L.val)+' = '+sg(contrib));
+        lines.push('<b>∂'+ex.y+'/∂'+L.p+' = '+sg(old)+' + '+sg(contrib)+' = '+sg(grads[L.p])+'</b>');
+        tips.push('<b>'+L.p+'</b> nhận gradient từ nhiều đường nên các đóng góp được cộng lại.');
+      }else{
+        lines.push('<b>∂'+ex.y+'/∂'+L.p+' = '+sg(gv)+' × '+sg(L.val)+' = '+sg(contrib)+'</b>');
+      }
+      lines.push('');
+    });
+    donebw[n.id]=1;
+    ex.leaves.forEach(function(l){
+      var us=users[l.id]||[], ok=true;
+      us.forEach(function(t){if(!donebw[t])ok=false;});
+      if(ok&&us.length)fin[l.id]=1;
+    });
+    steps.push({kind:'bwd',node:n.id,shown:cp(shown),grads:cp(grads),edges:cp(edges),fin:cp(fin),
+      tt:'Chain rule tại nút '+n.id,
+      why:'Gradient đang ở '+n.id+' được chuyển ngược cho từng đầu vào, mỗi lần nhân với đạo hàm địa phương ghi trên cạnh.',
+      fm:lines,tip:tips[0]||''});
+  }
+
+  var ans=ex.leaves.map(function(l){return '∂'+ex.y+'/∂'+l.id+' = '+sg(grads[l.id]);});
+  steps.push({kind:'done',shown:cp(shown),grads:cp(grads),edges:cp(edges),fin:cp(fin),
+    tt:'Xong — đã có gradient của mọi biến',
+    why:'Chỉ một lượt đi ngược là có đạo hàm theo tất cả các biến cùng lúc. Đó là lý do lan truyền ngược rẻ hơn tính riêng từng đạo hàm.',
+    fm:[ '<span class="lb">công thức tổng quát</span>', ex.giai, '', '<span class="lb">với bộ số hiện tại</span>' ].concat(
+        ex.leaves.map(function(l){return '<b>∂'+ex.y+'/∂'+l.id+' = '+sg(grads[l.id])+'</b>';})),
+    tip:'Bảng bên dưới so kết quả này với sai phân trung tâm để chắc chắn không sai chỗ nào.'});
+  GR=grads;
+}
+var GR={};
+
+/* ===================== VẼ SƠ ĐỒ ===================== */
+function box(n,leaf){
+  var w=leaf?LW:NW, x=n.x-w/2, y=n.y-NH/2;
+  var name=leaf?n.id:lbl(n);
+  return '<g class="nd'+(leaf?' leaf':'')+'" id="N_'+n.id+'" data-id="'+n.id+'">'+
+    '<rect class="shape" x="'+x+'" y="'+y+'" width="'+w+'" height="'+NH+'" rx="'+(leaf?16:3)+'"/>'+
+    '<text class="nm" x="'+n.x+'" y="'+(n.y-13)+'" text-anchor="middle">'+name+'</text>'+
+    '<text class="vl" id="NV_'+n.id+'" x="'+n.x+'" y="'+(n.y+5)+'" text-anchor="middle">—</text>'+
+    '<text class="gr" id="NG_'+n.id+'" x="'+n.x+'" y="'+(n.y+22)+'" text-anchor="middle">—</text></g>';
+}
+function edgeGeo(a,b){
+  var wa=isLeaf(a.id)?LW:NW, wb=isLeaf(b.id)?LW:NW;
+  var sx=a.x+wa/2, sy=a.y, exx=b.x-wb/2, ey=b.y;
+  var dx=exx-sx, dy=ey-sy, L=Math.sqrt(dx*dx+dy*dy)||1;
+  var px=-dy/L*5, py=dx/L*5;
+  return {f:'M'+(sx+px)+' '+(sy+py)+' L'+(exx+px)+' '+(ey+py),
+          b:'M'+(exx-px)+' '+(ey-py)+' L'+(sx-px)+' '+(sy-py),
+          lx:(sx+exx)/2-px*2.6, ly:(sy+ey)/2-py*2.6-3};
+}
+function draw(){
+  var s='<svg viewBox="0 0 '+ex.vb[0]+' '+ex.vb[1]+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ tính toán">'+
+   '<defs><marker id="af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'+
+   '<path d="M0 1 L7.5 4.5 L0 8 Z" fill="#8496a1"/></marker>'+
+   '<marker id="ab" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'+
+   '<path d="M0 1 L7.5 4.5 L0 8 Z" fill="#c0143c"/></marker></defs>';
+  s+='<text class="band" x="14" y="20">lan truyền xuôi: tính giá trị  →</text>';
+  s+='<text class="band bw" x="'+(ex.vb[0]-14)+'" y="'+(ex.vb[1]-10)+'" text-anchor="end">←  lan truyền ngược: nhân dồn đạo hàm</text>';
+  ex.nodes.forEach(function(n){
+    n.in.forEach(function(p){
+      var g=edgeGeo(nodeOf(p),n), key=n.id+'>'+p;
+      s+='<path class="ef" id="EF_'+key+'" d="'+g.f+'" marker-end="url(#af)"/>';
+      s+='<path class="eb" id="EB_'+key+'" d="'+g.b+'" marker-end="url(#ab)"/>';
+      s+='<text class="el" id="EL_'+key+'" x="'+g.lx+'" y="'+g.ly+'" text-anchor="middle">—</text>';
+    });
+  });
+  ex.leaves.forEach(function(l){s+=box(l,true);});
+  ex.nodes.forEach(function(n){s+=box(n,false);});
+  $('gbox').innerHTML=s+'</svg>';
+  $('gbox').querySelectorAll('.nd').forEach(function(g){
+    g.addEventListener('click',function(){jump(g.getAttribute('data-id'));});
+  });
+}
+
+/* ===================== HIỂN THỊ ===================== */
+function render(){
+  var st=steps[k],i;
+  ex.leaves.concat(ex.nodes).forEach(function(n){
+    var g=$('N_'+n.id), leaf=isLeaf(n.id), c='nd'+(leaf?' leaf':'');
+    if(st.shown[n.id]) c+=' on';
+    if(st.grads[n.id]!==undefined) c+=' grad';
+    if(st.kind==='fwd'&&st.node===n.id) c+=' act';
+    if(st.kind==='bwd'&&st.node===n.id) c+=' actb';
+    if(st.kind==='seed'&&n.id===ex.y) c+=' actb';
+    if(st.fin[n.id]) c+=' fin';
+    g.setAttribute('class',c);
+    $('NV_'+n.id).textContent=st.shown[n.id]?fm(V[n.id]):'—';
+    $('NG_'+n.id).textContent=st.grads[n.id]!==undefined?('∂'+ex.y+'/∂'+n.id+' = '+sg(st.grads[n.id])):'';
+  });
+  ex.nodes.forEach(function(n){
+    n.in.forEach(function(p){
+      var key=n.id+'>'+p, on=!!st.edges[key];
+      $('EF_'+key).setAttribute('class','ef'+(st.shown[n.id]?' on':''));
+      $('EB_'+key).setAttribute('class','eb'+(on?' on':''));
+      var L=LOC[n.id].filter(function(t){return t.p===p;})[0];
+      $('EL_'+key).setAttribute('class','el'+(on?' on':''));
+      $('EL_'+key).textContent='× '+sg(L.val);
+    });
+  });
+  var ph=st.kind==='init'||st.kind==='fwd'?'xuôi':(st.kind==='done'?'xong':'ngược');
+  $('tgPhase').innerHTML='giai đoạn: <b>'+ph+'</b>';
+  $('tgPhase').className='tagx '+(ph==='xuôi'?'fw':ph==='ngược'?'bw':'fin');
+  $('tgStep').innerHTML='bước <b>'+(k+1)+'</b>/'+steps.length;
+  $('hdS').textContent=st.kind==='done'?'kết quả':(st.node||'');
+  var h='<p class="kick">'+(st.kind==='bwd'||st.kind==='seed'||st.kind==='done'?'lan truyền ngược':'lan truyền xuôi')+'</p>'+
+        '<h2>'+st.tt+'</h2><p class="why">'+st.why+'</p>'+
+        '<div class="fm">'+st.fm.join('<br>')+'</div>';
+  if(st.tip) h+='<p class="tip">'+st.tip+'</p>';
+  $('stp').innerHTML=h;
+  $('bPrev').disabled=(k===0); $('bNext').disabled=(k===steps.length-1);
+  $('bAll').disabled=(k===steps.length-1);
+  $('bRun').disabled=(k===steps.length-1);
+  renderTab(); renderChk();
+}
+function renderTab(){
+  var st=steps[k];
+  var h='<thead><tr><th>nút</th><th>biểu thức</th><th>giá trị</th><th>đạo hàm địa phương</th><th>∂'+ex.y+'/∂nút</th></tr></thead><tbody>';
+  ex.leaves.forEach(function(l){
+    h+='<tr class="leaf"><td>'+l.id+'</td><td>biến đầu vào</td><td>'+fm(l.v)+'</td><td class="na">—</td>'+
+       (st.grads[l.id]!==undefined?'<td'+(st.fin[l.id]?' class="new"':'')+'>'+sg(st.grads[l.id])+'</td>':'<td class="na">—</td>')+'</tr>';
+  });
+  ex.nodes.forEach(function(n){
+    var loc=LOC[n.id].map(function(L){return '∂'+n.id+'/∂'+L.p+'='+sg(L.val);}).join('  ');
+    h+='<tr><td>'+n.id+'</td><td>'+lbl(n)+'</td>'+
+       (st.shown[n.id]?'<td>'+fm(V[n.id])+'</td>':'<td class="na">—</td>')+
+       (st.shown[n.id]?'<td>'+loc+'</td>':'<td class="na">—</td>')+
+       (st.grads[n.id]!==undefined?'<td>'+sg(st.grads[n.id])+'</td>':'<td class="na">—</td>')+'</tr>';
+  });
+  $('tab').innerHTML=h+'</tbody>';
+}
+function renderChk(){
+  var st=steps[k],ok=true,maxd=0;
+  var h='<thead><tr><th>biến</th><th>chain rule</th><th>sai phân trung tâm</th><th>lệch</th></tr></thead><tbody>';
+  ex.leaves.forEach(function(l){
+    if(st.fin[l.id]){
+      var a=st.grads[l.id], b=numDeriv(l.id), d=Math.abs(a-b);
+      if(d>maxd)maxd=d;
+      h+='<tr><td>∂'+ex.y+'/∂'+l.id+'</td><td>'+sg(a)+'</td><td>'+sg(b)+'</td><td class="ok">'+d.toExponential(1)+'</td></tr>';
+    }else{ ok=false;
+      h+='<tr><td>∂'+ex.y+'/∂'+l.id+'</td><td class="na">chưa tính</td><td class="na">—</td><td class="na">—</td></tr>'; }
+  });
+  h+='<tr><td>'+ex.y+' (giá trị hàm)</td><td colspan="3"'+(st.shown[ex.y]?'':' class="na"')+'>'+
+     (st.shown[ex.y]?fm(V[ex.y]):'chưa tính xong')+'</td></tr>';
+  $('chk').innerHTML=h+'</tbody>';
+  $('chkNote').innerHTML=ok?
+    ('Sai phân trung tâm dùng h = 1e-5, hoàn toàn không biết gì về chain rule. Lệch lớn nhất '+maxd.toExponential(1)+
+     ' — đúng cỡ sai số làm tròn, nghĩa là dây chuyền nhân ở trên không sót chỗ nào.'):
+    'Cột kiểm chứng sẽ hiện khi gradient của biến đó tính xong. Sai phân trung tâm: (f(v+h) − f(v−h)) / 2h.';
+}
+
+/* ===================== ĐIỀU KHIỂN ===================== */
+function jump(id){
+  stop();
+  var i,bestF=-1,bestB=-1;
+  for(i=0;i<steps.length;i++){
+    if(steps[i].node===id&&steps[i].kind==='fwd')bestF=i;
+    if(steps[i].node===id&&steps[i].kind==='bwd')bestB=i;
+  }
+  var ph=steps[k].kind;
+  var t=(ph==='bwd'||ph==='seed'||ph==='done')?(bestB>=0?bestB:bestF):(bestF>=0?bestF:bestB);
+  if(t>=0){k=t;render();}
+}
+function go(d){stop();k=Math.max(0,Math.min(steps.length-1,k+d));render();}
+function tick(){ if(!running)return;
+  if(k>=steps.length-1){stop();return;}
+  k++;render(); timer=setTimeout(tick,speed); }
+function play(){ if(running||k>=steps.length-1)return; running=true;
+  $('bRun').textContent='Dừng';$('bRun').classList.add('solid');tick(); }
+function stop(){ running=false; if(timer)clearTimeout(timer); timer=null;
+  var r=$('bRun'); if(r){r.textContent='Chạy';r.classList.remove('solid');} }
+
+function setEx(i,keep){
+  stop(); cur=i;
+  build();
+  $('hdF').textContent=EXS[i].ct;
+  draw(); buildInputs();
+  k=keep?Math.min(k,steps.length-1):0;
+  render();
+}
+function buildInputs(){
+  var h='';
+  ex.leaves.forEach(function(l){
+    h+='<div class="sl"><div class="sl-head"><label for="S_'+l.id+'">'+l.id+'</label>'+
+       '<b id="SV_'+l.id+'">'+fm(l.v)+'</b></div>'+
+       '<input type="range" id="S_'+l.id+'" min="'+l.min+'" max="'+l.max+'" step="'+l.st+'" value="'+l.v+'"></div>';
+  });
+  $('inp').innerHTML=h;
+  ex.leaves.forEach(function(l){
+    $('S_'+l.id).addEventListener('input',function(e){
+      l.v=parseFloat(e.target.value);
+      $('SV_'+l.id).textContent=fm(l.v);
+      var keep=k; build(); k=Math.min(keep,steps.length-1); render();
+    });
+  });
+}
+
+EXS.forEach(function(e,i){
+  var o=document.createElement('option'); o.value=i; o.textContent=e.ten; $('selEx').appendChild(o);
+});
+$('selEx').addEventListener('change',function(e){setEx(parseInt(e.target.value,10),false);});
+$('selS').addEventListener('change',function(e){speed=parseInt(e.target.value,10);});
+$('bNext').addEventListener('click',function(){go(1);});
+$('bPrev').addEventListener('click',function(){go(-1);});
+$('bRun').addEventListener('click',function(){running?stop():play();});
+$('bAll').addEventListener('click',function(){stop();k=steps.length-1;render();});
+$('bReset').addEventListener('click',function(){stop();k=0;render();});
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='SELECT'||e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){e.preventDefault();go(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();go(-1);}
+  else if(e.key===' '){e.preventDefault();running?stop():play();}
+  else if(e.key==='r'||e.key==='R'){stop();k=0;render();}
+});
+setEx(0,false);
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.git
+torchviz-source
+backend
+__pycache__
+*.gguf
+*.log
+.env*

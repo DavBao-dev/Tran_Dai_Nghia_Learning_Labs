@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chạy từng bước thuật toán hồi quy tuyến tính — sơ đồ khối và mã Python</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#d9e0e4; --paper-2:#e9eef0; --white:#fafcfc;
+  --ink:#15242e; --ink-70:#4a5e6a; --ink-40:#8496a1;
+  --rule:#b9c6cd; --rule-soft:#cdd7dc;
+  --signal:#c0143c; --signal-soft:rgba(192,20,60,.12);
+  --data:#1d4c6b; --good:#0f7355; --warn:#a8570b;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--sans);color:var(--ink);font-size:15px;line-height:1.55;
+  background-color:var(--paper);
+  background-image:linear-gradient(to right,rgba(21,36,46,.045) 1px,transparent 1px),
+                   linear-gradient(to bottom,rgba(21,36,46,.045) 1px,transparent 1px);
+  background-size:28px 28px}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+p{margin:0}
+code{font-family:var(--mono)}
+
+.top{border-bottom:1px solid var(--rule);padding:22px 26px 18px;
+  background:linear-gradient(to bottom,rgba(250,252,252,.92),rgba(250,252,252,.4))}
+.top-in{max-width:1620px;margin:0 auto;display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+h1{font-size:clamp(23px,2.7vw,33px)}
+.sub{color:var(--ink-70);font-weight:300;max-width:62ch;margin-top:7px;font-size:14.5px}
+
+/* ---- thanh điều khiển ---- */
+.bar{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--rule);
+  background:rgba(233,238,240,.96);backdrop-filter:blur(6px)}
+.bar-in{max-width:1620px;margin:0 auto;padding:10px 26px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+button.btn{all:unset;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:600;
+  padding:7px 14px;border:1px solid var(--ink);border-radius:3px;color:var(--ink);transition:background .12s,color .12s}
+button.btn:hover{background:var(--ink);color:var(--white)}
+button.btn.solid{background:var(--ink);color:var(--white)}
+button.btn.solid:hover{background:var(--signal);border-color:var(--signal)}
+button.btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+button.btn[disabled]{opacity:.32;cursor:not-allowed;background:transparent;color:var(--ink)}
+.sep{width:1px;height:26px;background:var(--rule)}
+label.fld{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-70)}
+select{font-family:var(--mono);font-size:13px;padding:5px 7px;border:1px solid var(--rule);
+  border-radius:3px;background:var(--white);color:var(--ink);cursor:pointer}
+select:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+.state{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12.5px}
+.tagx{border:1px solid var(--rule);background:var(--white);padding:4px 10px;border-radius:99px;color:var(--ink-70)}
+.tagx b{color:var(--ink);font-weight:600}
+.tagx.run{border-color:var(--signal);color:var(--signal);background:var(--signal-soft)}
+.tagx.fin{border-color:rgba(15,115,85,.5);color:var(--good);background:rgba(15,115,85,.08)}
+
+/* ---- lưới ---- */
+.wrap{max-width:1620px;margin:0 auto;padding:16px 26px 50px;display:flex;flex-direction:column;gap:14px}
+.grid{display:grid;grid-template-columns:372px minmax(0,1fr) 392px;gap:14px;align-items:stretch}
+.grid2{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:14px}
+.card{background:var(--white);border:1px solid var(--rule);border-radius:3px;display:flex;flex-direction:column;min-width:0}
+.hd{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between;align-items:baseline;
+  padding:9px 14px;border-bottom:1px solid var(--rule-soft);font-size:13px;font-weight:600}
+.hd span{font-weight:400;font-size:12px;color:var(--ink-40);font-family:var(--mono)}
+.hd a{color:var(--signal);text-decoration:underline;text-underline-offset:2px}
+.hd a:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* ---- sơ đồ ---- */
+.flow{overflow:auto;padding:6px 4px 10px;height:620px;scrollbar-width:thin}
+.flow svg{display:block;width:100%;height:auto}
+.node .shape{fill:var(--white);stroke:var(--rule);stroke-width:1.4;transition:fill .18s,stroke .18s}
+.node .lbl{fill:var(--ink);font:600 11.5px var(--sans)}
+.node .sub{fill:var(--ink-70);font:400 10px var(--mono)}
+.node.done .shape{fill:#eaf0f2;stroke:var(--rule)}
+.node.active .shape{fill:var(--ink);stroke:var(--signal);stroke-width:2.6}
+.node.active .lbl,.node.active .sub{fill:#fafcfc}
+.edge{fill:none;stroke:var(--ink-40);stroke-width:1.4}
+.edge.hot{stroke:var(--signal);stroke-width:2.2}
+.elbl{fill:var(--ink-40);font:500 10px var(--mono)}
+.elbl.hot{fill:var(--signal)}
+
+/* ---- mã nguồn ---- */
+.code{overflow:auto;height:620px;padding:8px 0 14px;font-family:var(--mono);font-size:12.6px;line-height:1.62}
+.ln{display:flex;gap:12px;padding:0 14px 0 0;white-space:pre}
+.ln .g{flex:none;width:38px;text-align:right;color:#9fb0ba;user-select:none;font-size:11.5px}
+.ln.on{background:var(--signal-soft);box-shadow:inset 3px 0 0 var(--signal)}
+.ln.on .g{color:var(--signal)}
+.t-kw{color:#9b2c8a;font-weight:600}
+.t-bi{color:#1d4c6b}
+.t-num{color:#a8570b}
+.t-str{color:#0f7355}
+.t-cmt{color:#8496a1;font-style:italic}
+.t-fn{color:#15242e;font-weight:600}
+
+/* ---- biến + console ---- */
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.vars{padding:4px 0}
+.vrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:5px 14px;border-bottom:1px solid var(--rule-soft);font-family:var(--mono);font-size:12.5px}
+.vrow:last-child{border-bottom:none}
+.vrow i{font-style:normal;color:var(--ink-70)}
+.vrow b{font-weight:600;color:var(--ink)}
+.vrow .cmt{font-family:var(--sans);font-size:11px;color:var(--ink-40);flex:1;text-align:right;padding-right:8px}
+.vrow.hit{background:var(--signal-soft)}
+.vrow.hit b{color:var(--signal)}
+.con{height:190px;overflow:auto;padding:9px 14px;font-family:var(--mono);font-size:12px;
+  line-height:1.72;color:var(--ink-70);background:#f2f6f7;border-radius:0 0 3px 3px}
+.con div{white-space:pre-wrap}
+.con .ok{color:var(--good)}
+.con .bad{color:var(--signal)}
+.con .hl{color:var(--ink);font-weight:600}
+
+/* ---- bảng ---- */
+.tb{overflow:auto;padding:0 0 4px}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+th{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--ink-40);text-align:right;
+  padding:6px 9px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{text-align:right;padding:4px 9px;border-bottom:1px solid var(--rule-soft);color:var(--ink-70);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr.sum td{border-bottom:none;border-top:1px solid var(--rule);color:var(--ink);font-weight:600;padding-top:7px}
+td.new{background:var(--signal-soft);color:var(--ink)}
+td.na{color:#c3ced4}
+td.aux{color:var(--ink-40);font-size:11.5px}
+
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.cbox{padding:8px 10px 4px}
+.cbox+.cbox{border-left:1px solid var(--rule-soft)}
+canvas{display:block;width:100%;height:196px}
+.foot{max-width:1620px;margin:0 auto;padding:0 26px 40px;color:var(--ink-40);font-size:12.5px}
+kbd{font-family:var(--mono);font-size:11.5px;border:1px solid var(--rule);border-bottom-width:2px;
+  border-radius:3px;padding:1px 5px;color:var(--ink-70);background:var(--white)}
+
+@media (max-width:1240px){
+  .grid{grid-template-columns:1fr;}
+  .flow,.code{height:480px}
+}
+@media (max-width:760px){
+  .top,.bar-in,.wrap,.foot{padding-left:14px;padding-right:14px}
+  .grid2{grid-template-columns:1fr}
+  .charts{grid-template-columns:1fr}
+  .cbox+.cbox{border-left:none;border-top:1px solid var(--rule-soft)}
+  .state{margin-left:0;width:100%}
+  .flow{height:420px}.code{height:400px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div>
+      <h1>Thuật toán hồi quy tuyến tính, chạy từng bước</h1>
+      
+    </div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="bar-in">
+    <button class="btn solid" id="bStep">Bước tiếp</button>
+    <button class="btn" id="bEpoch">Hết vòng lặp</button>
+    <button class="btn" id="bRun">Chạy</button>
+    <button class="btn" id="bAll">Chạy hết</button>
+    <button class="btn" id="bReset">Đặt lại</button>
+    <div class="sep"></div>
+    <label class="fld">α
+      <select id="selA">
+        <option value="0.1">0.10 — quá chậm</option>
+        <option value="0.45" selected>0.45 — vừa</option>
+        <option value="0.52">0.52 — dao động</option>
+        <option value="0.58">0.58 — phân kỳ</option>
+      </select>
+    </label>
+    <label class="fld">tốc độ
+      <select id="selS">
+        <option value="750">chậm</option>
+        <option value="320" selected>vừa</option>
+        <option value="110">nhanh</option>
+      </select>
+    </label>
+    <div class="state">
+      <span class="tagx" id="tgNode">khối: <b>Bắt đầu</b></span>
+      <span class="tagx" id="tgEpoch">vòng lặp <b>—</b>/150</span>
+      <span class="tagx" id="tgStep">bước <b>0</b></span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="card">
+      <div class="hd">Sơ đồ khối thuật toán<span id="hdFlow">khối đang chạy được tô đậm</span></div>
+      <div class="flow" id="flow"></div>
+    </div>
+
+    <div class="card">
+      <div class="hd">linear_regression.py<span>Python thuần · <a href="#" id="dl">tải file .py</a></span></div>
+      <div class="code" id="code"></div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <div class="hd">Biến trong bộ nhớ<span id="hdVar">giá trị hiện tại</span></div>
+        <div class="vars" id="vars"></div>
+      </div>
+      <div class="card">
+        <div class="hd">Kết quả in ra<span>stdout</span></div>
+        <div class="con" id="con"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="hd">Bảng tính của vòng lặp hiện tại<span id="hdTab">x: trăm m² · y: tỷ đồng</span></div>
+      <div class="tb"><table id="tab"></table></div>
+    </div>
+    <div class="card">
+      <div class="hd">Kết quả<span id="hdCh">đường hồi quy và mất mát J</span></div>
+      <div class="charts">
+        <div class="cbox"><canvas id="cFit"></canvas></div>
+        <div class="cbox"><canvas id="cLoss"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  <kbd>Space</kbd> chạy hoặc dừng, <kbd>→</kbd> một bước, <kbd>Enter</kbd> hết một vòng lặp, <kbd>R</kbd> đặt lại.
+  Dữ liệu 6 căn nhà là số liệu mô phỏng: x là diện tích tính bằng trăm m² (0.65 = 65 m²), y là giá bán tính bằng tỷ đồng. Mã Python trong khung là mã thật đang được thực thi.
+</footer>
+
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i);};
+
+/* ===================== MÃ NGUỒN PYTHON ===================== */
+var SRC=[
+'# Hồi quy tuyến tính bằng gradient descent, viết từ đầu',
+'# Không dùng thư viện ngoài, không chuẩn hóa dữ liệu',
+'',
+'# --- 1. dữ liệu ---',
+'# x: diện tích, đơn vị trăm m2  (0.65 nghĩa là 65 m2)',
+'# y: giá bán, đơn vị tỷ đồng',
+'x = [0.25, 0.40, 0.65, 0.90, 1.20, 1.60]',
+'y = [2.9, 4.1, 5.6, 7.5, 9.6, 12.4]',
+'n = len(x)',
+'',
+'# --- 2. khởi tạo tham số ---',
+'w, b = 0.0, 0.0',
+'alpha = 0.45',
+'max_epoch = 150',
+'eps = 1e-4',
+'lich_su = []',
+'',
+'# --- 3. vòng lặp học ---',
+'for epoch in range(max_epoch):',
+'',
+'    # dự đoán cho từng mẫu',
+'    y_hat = [w * x[i] + b for i in range(n)]',
+'',
+'    # sai số của từng mẫu',
+'    e = [y_hat[i] - y[i] for i in range(n)]',
+'',
+'    # hàm mất mát MSE',
+'    J = sum(ei ** 2 for ei in e) / n',
+'    lich_su.append(J)',
+'    print("epoch %3d   J = %.6f   w = %.4f   b = %.4f" % (epoch, J, w, b))',
+'',
+'    # đạo hàm riêng của J theo w và theo b',
+'    dw = 2 / n * sum(e[i] * x[i] for i in range(n))',
+'    db = 2 / n * sum(e)',
+'',
+'    # dừng sớm khi gradient đã đủ nhỏ',
+'    if (dw ** 2 + db ** 2) ** 0.5 < eps:',
+'        print("Gradient đủ nhỏ, dừng sớm ở vòng lặp", epoch)',
+'        break',
+'',
+'    # cập nhật ngược hướng gradient',
+'    w = w - alpha * dw',
+'    b = b - alpha * db',
+'',
+'# --- 4. dùng mô hình để dự đoán ---',
+'def du_doan(dien_tich):',
+'    return w * dien_tich + b',
+'',
+'print("Mô hình: gia = %.6f * dien_tich + %.6f" % (w, b))',
+'print("Căn 75 m2 => %.2f tỷ đồng" % du_doan(0.75))'
+];
+var ALPHA_LINE=12; /* chỉ số 0-based của dòng alpha = ... */
+
+/* ===================== SƠ ĐỒ KHỐI ===================== */
+var NODES=[
+ {id:'start',k:'term',y:14,  w:150,h:38,t:['Bắt đầu']},
+ {id:'input',k:'io',  y:82,  w:272,h:46,t:['Nhập dữ liệu','x (trăm m²), y (tỷ),  n = số mẫu']},
+ {id:'init', k:'proc',y:172, w:272,h:46,t:['Khởi tạo tham số','w = 0, b = 0, α, max_epoch, epoch = 0']},
+ {id:'check',k:'dec', y:262, w:250,h:74,t:['epoch < max_epoch ?']},
+ {id:'pred', k:'proc',y:380, w:272,h:46,t:['Dự đoán từng mẫu','ŷᵢ = w · xᵢ + b']},
+ {id:'err',  k:'proc',y:470, w:272,h:46,t:['Tính sai số','eᵢ = ŷᵢ − yᵢ']},
+ {id:'loss', k:'proc',y:560, w:272,h:46,t:['Tính hàm mất mát','J = (1/n) · Σ eᵢ²']},
+ {id:'grad', k:'proc',y:650, w:272,h:46,t:['Tính gradient','dw = (2/n)Σeᵢxᵢ    db = (2/n)Σeᵢ']},
+ {id:'conv', k:'dec', y:740, w:250,h:74,t:['|∇J| < ε ?']},
+ {id:'upd',  k:'proc',y:858, w:272,h:46,t:['Cập nhật tham số','w ← w − α·dw    b ← b − α·db']},
+ {id:'out',  k:'io',  y:944, w:272,h:46,t:['Xuất mô hình','và dự đoán giá căn mới']},
+ {id:'end',  k:'term',y:1030,w:150,h:38,t:['Kết thúc']}
+];
+var EDGES=[
+ {id:'start>input',d:'M175 52 L175 78'},
+ {id:'input>init', d:'M175 128 L175 168'},
+ {id:'init>check', d:'M175 218 L175 258'},
+ {id:'check>pred', d:'M175 336 L175 376', l:'Đúng', lx:183, ly:360},
+ {id:'pred>err',   d:'M175 426 L175 466'},
+ {id:'err>loss',   d:'M175 516 L175 556'},
+ {id:'loss>grad',  d:'M175 606 L175 646'},
+ {id:'grad>conv',  d:'M175 696 L175 736'},
+ {id:'conv>upd',   d:'M175 814 L175 854', l:'Sai', lx:183, ly:838},
+ {id:'upd>check',  d:'M39 881 L22 881 L22 299 L46 299', l:'vòng lặp kế', rot:true},
+ {id:'check>out',  d:'M300 299 L336 299 L336 926 L175 926 L175 940', l:'Sai', lx:304, ly:291},
+ {id:'conv>out',   d:'M300 777 L336 777 L336 926 L175 926 L175 940', l:'Đúng', lx:304, ly:769},
+ {id:'out>end',    d:'M175 990 L175 1026'}
+];
+var NODE_LINES={start:[],input:[7,8,9],init:[12,13,14,15,16],check:[19],pred:[22],err:[25],
+  loss:[28,29,30],grad:[33,34],conv:[37,38,39],upd:[42,43],out:[46,47,49,50],end:[50]};
+var NODE_NAME={};NODES.forEach(function(nd){NODE_NAME[nd.id]=nd.t[0];});
+
+function svgEsc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function shape(nd){
+  var cx=175,x0=cx-nd.w/2,x1=cx+nd.w/2,y0=nd.y,y1=nd.y+nd.h;
+  if(nd.k==='term') return '<rect class="shape" x="'+x0+'" y="'+y0+'" width="'+nd.w+'" height="'+nd.h+'" rx="'+(nd.h/2)+'"/>';
+  if(nd.k==='proc') return '<rect class="shape" x="'+x0+'" y="'+y0+'" width="'+nd.w+'" height="'+nd.h+'" rx="3"/>';
+  if(nd.k==='io')   return '<path class="shape" d="M'+(x0+14)+' '+y0+' L'+x1+' '+y0+' L'+(x1-14)+' '+y1+' L'+x0+' '+y1+' Z"/>';
+  return '<path class="shape" d="M'+cx+' '+y0+' L'+x1+' '+(y0+nd.h/2)+' L'+cx+' '+y1+' L'+x0+' '+(y0+nd.h/2)+' Z"/>';
+}
+function buildFlow(){
+  var s='<svg viewBox="0 0 360 1082" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ khối thuật toán hồi quy tuyến tính">'+
+    '<defs>'+
+    '<marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'+
+      '<path d="M0 1 L7.5 4.5 L0 8 Z" fill="#8496a1"/></marker>'+
+    '<marker id="arh" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'+
+      '<path d="M0 1 L7.5 4.5 L0 8 Z" fill="#c0143c"/></marker>'+
+    '</defs>';
+  EDGES.forEach(function(e){
+    s+='<path class="edge" id="E_'+e.id+'" d="'+e.d+'" marker-end="url(#ar)"/>';
+    if(e.l){
+      if(e.rot) s+='<text class="elbl" id="L_'+e.id+'" transform="translate(16,590) rotate(-90)" text-anchor="middle">'+e.l+'</text>';
+      else s+='<text class="elbl" id="L_'+e.id+'" x="'+e.lx+'" y="'+e.ly+'">'+e.l+'</text>';
+    }
+  });
+  s+='<path class="edge hot" id="hotEdge" d="" marker-end="url(#arh)"/>';
+  NODES.forEach(function(nd){
+    var cy=nd.y+nd.h/2;
+    s+='<g class="node" id="N_'+nd.id+'">'+shape(nd);
+    if(nd.t.length===1) s+='<text class="lbl" x="175" y="'+(cy+4)+'" text-anchor="middle">'+svgEsc(nd.t[0])+'</text>';
+    else s+='<text class="lbl" x="175" y="'+(cy-4)+'" text-anchor="middle">'+svgEsc(nd.t[0])+'</text>'+
+            '<text class="sub" x="175" y="'+(cy+12)+'" text-anchor="middle">'+svgEsc(nd.t[1])+'</text>';
+    s+='</g>';
+  });
+  return s+'</svg>';
+}
+
+/* ===================== TÔ MÀU MÃ PYTHON ===================== */
+var TOK=/(#[^\n]*)|("(?:[^"\\]|\\.)*")|\b(\d+\.?\d*(?:e-?\d+)?)\b|\b(def|for|in|if|else|elif|while|return|break|continue|and|or|not|None|True|False)\b|\b(print|len|sum|range|round|float|int|abs|append)\b|\b([A-Za-z_]\w*)(?=\s*\()/g;
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function paint(line){
+  var out='',last=0,m;TOK.lastIndex=0;
+  while((m=TOK.exec(line))!==null){
+    out+=esc(line.slice(last,m.index));
+    var c=m[1]?'t-cmt':m[2]?'t-str':m[3]?'t-num':m[4]?'t-kw':m[5]?'t-bi':'t-fn';
+    out+='<span class="'+c+'">'+esc(m[0])+'</span>';
+    last=m.index+m[0].length;
+  }
+  return out+esc(line.slice(last));
+}
+function buildCode(){
+  var h='';
+  for(var i=0;i<SRC.length;i++)
+    h+='<div class="ln" id="L'+(i+1)+'"><span class="g">'+(i+1)+'</span><span class="c">'+paint(SRC[i])+'</span></div>';
+  $('code').innerHTML=h;
+}
+
+/* ===================== DỮ LIỆU & MÁY ẢO ===================== */
+var X=[0.25,0.40,0.65,0.90,1.20,1.60], Y=[2.9,4.1,5.6,7.5,9.6,12.4], N=X.length;
+var W0=0.0, B0=0.0, MAXE=150, EPS=1e-4;
+var alpha=0.45, speed=320;
+var VM, timer=null, running=false;
+
+function f(v,d){return (v===null||v===undefined)?'—':(!isFinite(v)?'∞':v.toFixed(d));}
+function fe(v,d){if(v===null||v===undefined)return '—';if(!isFinite(v))return '∞';
+  return (Math.abs(v)>=1e5||(Math.abs(v)<1e-4&&v!==0))?v.toExponential(2):v.toFixed(d);}
+/* pf: in giống hệt %f của Python để dòng stdout khớp từng ký tự */
+function pf(v,d){return isFinite(v)?v.toFixed(d):(v>0?'inf':'-inf');}
+function pad(v,w){var s=String(v);while(s.length<w)s=' '+s;return s;}
+function tong(a){var s=0;for(var i=0;i<a.length;i++)s+=a[i];return s;}
+
+function reset(){
+  stop();
+  VM={node:'start',prev:null,edge:null,epoch:null,w:null,b:null,dw:null,db:null,J:null,
+      gnorm:null,yhat:[],e:[],e2:[],ex:[],loss:[],done:false,steps:0,visited:{},hit:{},
+      n:null,stop:''};
+  $('con').innerHTML='';
+  log('&gt;&gt;&gt; python linear_regression.py','hl');
+  render();
+}
+function log(html,cls){
+  var d=document.createElement('div');
+  if(cls)d.className=cls;
+  d.innerHTML=html;
+  $('con').appendChild(d);
+  $('con').scrollTop=$('con').scrollHeight;
+}
+
+function step(){
+  if(VM.done)return false;
+  var v=VM, hit={};
+  v.prev=v.node;
+  switch(v.node){
+    case 'start':
+      v.edge='start>input'; v.node='input'; break;
+    case 'input':
+      v.n=N; hit.n=1; v.edge='input>init'; v.node='init'; break;
+    case 'init':
+      v.w=W0; v.b=B0; v.epoch=0; hit.w=1;hit.b=1;hit.epoch=1;
+      v.edge='init>check'; v.node='check'; break;
+    case 'check':
+      v.yhat=[];v.e=[];v.e2=[];v.ex=[];v.J=null;v.dw=null;v.db=null;v.gnorm=null;
+      if(v.epoch<MAXE){ v.edge='check>pred'; v.node='pred'; }
+      else { v.stop='hết số vòng lặp'; v.edge='check>out'; v.node='out';
+             var phanky=v.loss[v.loss.length-1]>v.loss[0];
+             log('Đã chạy hết '+MAXE+' vòng lặp mà gradient chưa đủ nhỏ.', phanky?'bad':'');
+             if(phanky) log('J tăng dần: α quá lớn nên thuật toán phân kỳ.','bad');
+             else log('α nhỏ nên mỗi bước đi rất ngắn, tăng α hoặc tăng max_epoch.',''); }
+      break;
+    case 'pred':
+      v.yhat=X.map(function(t){return v.w*t+v.b;});
+      hit.y_hat=1; v.edge='pred>err'; v.node='err'; break;
+    case 'err':
+      v.e=v.yhat.map(function(t,i){return t-Y[i];});
+      hit.e=1; v.edge='err>loss'; v.node='loss'; break;
+    case 'loss':
+      v.e2=v.e.map(function(t){return t*t;});
+      v.J=tong(v.e2)/N; v.loss.push(v.J); hit.J=1;
+      log('epoch '+pad(v.epoch,3)+'   J = '+pf(v.J,6)+'   w = '+pf(v.w,4)+'   b = '+pf(v.b,4));
+      v.edge='loss>grad'; v.node='grad'; break;
+    case 'grad':
+      v.ex=v.e.map(function(t,i){return t*X[i];});
+      v.dw=2/N*tong(v.ex);
+      v.db=2/N*tong(v.e);
+      v.gnorm=Math.sqrt(v.dw*v.dw+v.db*v.db);
+      hit.dw=1;hit.db=1; v.edge='grad>conv'; v.node='conv'; break;
+    case 'conv':
+      if(v.gnorm<EPS){ v.stop='hội tụ';
+        log('Gradient đủ nhỏ, dừng sớm ở vòng lặp '+v.epoch,'ok');
+        v.edge='conv>out'; v.node='out'; }
+      else { v.edge='conv>upd'; v.node='upd'; }
+      break;
+    case 'upd':
+      v.w=v.w-alpha*v.dw; v.b=v.b-alpha*v.db; v.epoch++;
+      hit.w=1;hit.b=1;hit.epoch=1; v.edge='upd>check'; v.node='check'; break;
+    case 'out':
+      log('Mô hình: gia = '+pf(v.w,6)+' * dien_tich + '+pf(v.b,6),'ok');
+      log('Căn 75 m2 => '+pf(v.w*0.75+v.b,2)+' tỷ đồng','ok');
+      v.edge='out>end'; v.node='end'; break;
+    case 'end':
+      v.done=true; v.edge=null; log('&gt;&gt;&gt; chương trình kết thúc','hl'); break;
+  }
+  v.visited[v.prev]=1; v.hit=hit; v.steps++;
+  return !v.done;
+}
+
+/* ===================== HIỂN THỊ ===================== */
+function render(){
+  var v=VM;
+  NODES.forEach(function(nd){
+    var g=$('N_'+nd.id); if(!g)return;
+    g.setAttribute('class','node'+(v.visited[nd.id]?' done':'')+(v.node===nd.id?' active':''));
+  });
+  EDGES.forEach(function(e){var t=$('L_'+e.id); if(t)t.setAttribute('class','elbl');});
+  var he=$('hotEdge');
+  if(v.edge){
+    var ed=EDGES.filter(function(e){return e.id===v.edge;})[0];
+    he.setAttribute('d',ed?ed.d:'');
+    var lt=$('L_'+v.edge); if(lt)lt.setAttribute('class','elbl hot');
+  } else he.setAttribute('d','');
+
+  var ln=NODE_LINES[v.node]||[];
+  for(var i=1;i<=SRC.length;i++){var el=$('L'+i);if(el)el.className='ln';}
+  ln.forEach(function(k){var el=$('L'+k);if(el)el.className='ln on';});
+  if(ln.length) scrollTo$('code',$('L'+ln[0]));
+  scrollNode(v.node);
+
+  $('tgNode').innerHTML='khối: <b>'+NODE_NAME[v.node]+'</b>';
+  $('tgEpoch').innerHTML='vòng lặp <b>'+(v.epoch===null?'—':v.epoch)+'</b>/'+MAXE;
+  $('tgStep').innerHTML='bước <b>'+v.steps+'</b>';
+  $('tgStep').className='tagx'+(v.done?' fin':running?' run':'');
+  $('bStep').disabled=v.done; $('bEpoch').disabled=v.done;
+  $('bRun').disabled=v.done; $('bAll').disabled=v.done;
+  renderVars(); renderTable(); drawFit(); drawLoss();
+}
+function scrollTo$(box,el){
+  if(!el)return; var c=$(box), t=el.offsetTop-c.offsetTop;
+  if(t<c.scrollTop+20||t>c.scrollTop+c.clientHeight-40)
+    c.scrollTop=Math.max(0,t-c.clientHeight*0.38);
+}
+function scrollNode(id){
+  var nd=NODES.filter(function(t){return t.id===id;})[0]; if(!nd)return;
+  var c=$('flow'), sv=c.querySelector('svg'); if(!sv)return;
+  var sc=sv.getBoundingClientRect().height/1082, t=nd.y*sc;
+  if(t<c.scrollTop+30||t+nd.h*sc>c.scrollTop+c.clientHeight-30)
+    c.scrollTop=Math.max(0,t-c.clientHeight*0.42);
+}
+var VROWS=[
+ ['n','n','số mẫu',function(v){return v.n===null?'—':v.n;}],
+ ['epoch','epoch','vòng lặp hiện tại',function(v){return v.epoch===null?'—':v.epoch;}],
+ ['w','w','tỷ đồng mỗi trăm m²',function(v){return fe(v.w,6);}],
+ ['b','b','hệ số chặn (tỷ)',function(v){return fe(v.b,6);}],
+ ['J','J','mất mát MSE',function(v){return fe(v.J,6);}],
+ ['dw','dw','∂J/∂w',function(v){return fe(v.dw,6);}],
+ ['db','db','∂J/∂b',function(v){return fe(v.db,6);}],
+ ['gn','','so với eps = 1e-4',function(v){return v.gnorm===null?'—':fe(v.gnorm,6);}]
+];
+function renderVars(){
+  var v=VM,h='';
+  VROWS.forEach(function(r){
+    var name=r[1]||'|∇J|';
+    h+='<div class="vrow'+(v.hit[r[0]]||(r[0]==='gn'&&v.hit.dw)?' hit':'')+'">'+
+       '<i>'+name+'</i><span class="cmt">'+r[2]+'</span><b>'+r[3](v)+'</b></div>';
+  });
+  $('vars').innerHTML=h;
+}
+function renderTable(){
+  var v=VM;
+  var h='<thead><tr><th>i</th><th>x (trăm m²)</th><th>= m²</th><th>y (tỷ)</th>'+
+        '<th>ŷ = w·x+b</th><th>e = ŷ−y</th><th>e²</th><th>e·x</th></tr></thead><tbody>';
+  for(var i=0;i<N;i++){
+    var cell=function(val,d,fresh){
+      return val===undefined||val===null?'<td class="na">—</td>':
+        '<td'+(fresh?' class="new"':'')+'>'+f(val,d)+'</td>';};
+    h+='<tr><td>'+i+'</td><td>'+X[i].toFixed(2)+'</td><td class="aux">'+Math.round(X[i]*100)+'</td>'+
+       '<td>'+Y[i].toFixed(1)+'</td>'+
+       cell(v.yhat[i],4,v.hit.y_hat)+cell(v.e[i],4,v.hit.e)+
+       cell(v.e2[i],4,v.hit.J)+cell(v.ex[i],4,v.hit.dw)+'</tr>';
+  }
+  h+='</tbody><tfoot><tr class="sum"><td colspan="4">tổng hợp</td>'+
+     '<td colspan="2">J = '+fe(v.J,6)+'</td>'+
+     '<td>dw = '+fe(v.dw,4)+'</td><td>db = '+fe(v.db,4)+'</td></tr></tfoot>';
+  $('tab').innerHTML=h;
+}
+
+/* ---------- biểu đồ ---------- */
+function plot(id,pad){
+  var c=$(id),x=c.getContext('2d'),P={c:c,x:x,pad:pad,dx:[0,1],dy:[0,1],w:0,h:0};
+  P.size=function(){var r=Math.max(1,window.devicePixelRatio||1),w=c.clientWidth,h=c.clientHeight;
+    if(c.width!==Math.round(w*r)||c.height!==Math.round(h*r)){c.width=Math.round(w*r);c.height=Math.round(h*r);}
+    x.setTransform(r,0,0,r,0,0);P.w=w;P.h=h;x.clearRect(0,0,w,h);};
+  P.iw=function(){return P.w-pad.l-pad.r;};P.ih=function(){return P.h-pad.t-pad.b;};
+  P.X=function(v){return pad.l+(v-P.dx[0])/(P.dx[1]-P.dx[0])*P.iw();};
+  P.Y=function(v){return pad.t+P.ih()-(v-P.dy[0])/(P.dy[1]-P.dy[0])*P.ih();};
+  P.axes=function(xt,yt,fx,fy){
+    x.font='10px "IBM Plex Mono",monospace';x.lineWidth=1;x.strokeStyle='#cdd7dc';
+    xt.forEach(function(v){var X=Math.round(P.X(v))+.5;x.beginPath();x.moveTo(X,pad.t);x.lineTo(X,pad.t+P.ih());x.stroke();});
+    yt.forEach(function(v){var Y=Math.round(P.Y(v))+.5;x.beginPath();x.moveTo(pad.l,Y);x.lineTo(P.w-pad.r,Y);x.stroke();});
+    x.fillStyle='#8496a1';x.textAlign='center';x.textBaseline='top';
+    xt.forEach(function(v){x.fillText(fx(v),P.X(v),pad.t+P.ih()+5);});
+    x.textAlign='right';x.textBaseline='middle';
+    yt.forEach(function(v){x.fillText(fy(v),pad.l-6,P.Y(v));});
+    x.strokeStyle='#b9c6cd';x.beginPath();x.moveTo(pad.l+.5,pad.t);x.lineTo(pad.l+.5,pad.t+P.ih()+.5);
+    x.lineTo(P.w-pad.r,pad.t+P.ih()+.5);x.stroke();};
+  return P;
+}
+var PF=plot('cFit',{l:32,r:12,t:10,b:20}), PL=plot('cLoss',{l:40,r:12,t:10,b:20});
+function drawFit(){
+  var v=VM;PF.size();PF.dx=[0,1.8];PF.dy=[0,14];
+  PF.axes([0,0.5,1,1.5],[0,4,8,12],function(t){return t.toFixed(1);},function(t){return t;});
+  var g=PF.x;
+  if(v.w!==null){
+    g.save();g.beginPath();g.rect(PF.pad.l,PF.pad.t,PF.iw(),PF.ih());g.clip();
+    g.strokeStyle='#c0143c';g.lineWidth=2;g.beginPath();
+    g.moveTo(PF.X(0),PF.Y(v.b));g.lineTo(PF.X(1.8),PF.Y(v.w*1.8+v.b));g.stroke();
+    g.restore();
+  }
+  for(var i=0;i<N;i++){
+    g.beginPath();g.arc(PF.X(X[i]),PF.Y(Y[i]),4.2,0,7);g.fillStyle='#1d4c6b';g.fill();
+    g.lineWidth=1.8;g.strokeStyle='#fafcfc';g.stroke();
+  }
+  g.fillStyle='#8496a1';g.font='10px "Be Vietnam Pro",sans-serif';
+  g.textAlign='right';g.textBaseline='bottom';g.fillText('trăm m²',PF.w-12,PF.h-2);
+}
+function drawLoss(){
+  var v=VM,H=v.loss;PL.size();
+  var hi=1;for(var i=0;i<H.length;i++)if(isFinite(H[i])&&H[i]>hi)hi=H[i];
+  PL.dx=[0,Math.max(9,H.length-1)];PL.dy=[0,hi*1.1];
+  var xt=[0,Math.round(PL.dx[1]/2),PL.dx[1]];
+  PL.axes(xt,[0,hi*0.5,hi],function(t){return t;},function(t){return hi>=100?t.toExponential(0):t.toFixed(2);});
+  var g=PL.x;
+  if(!H.length){g.fillStyle='#8496a1';g.font='11px "Be Vietnam Pro",sans-serif';
+    g.textAlign='center';g.textBaseline='middle';g.fillText('chưa có vòng lặp nào',PL.w/2,PL.h/2);return;}
+  g.save();g.beginPath();g.rect(PL.pad.l,PL.pad.t,PL.iw(),PL.ih());g.clip();
+  g.strokeStyle='#c0143c';g.lineWidth=2;g.lineJoin='round';g.beginPath();
+  H.forEach(function(J,i){var Xp=PL.X(i),Yp=PL.Y(isFinite(J)?J:hi);
+    if(i===0)g.moveTo(Xp,Yp);else g.lineTo(Xp,Yp);});
+  g.stroke();
+  g.fillStyle='#c0143c';g.beginPath();
+  g.arc(PL.X(H.length-1),PL.Y(isFinite(H[H.length-1])?H[H.length-1]:hi),3.4,0,7);g.fill();
+  g.restore();
+  g.fillStyle='#8496a1';g.font='10px "Be Vietnam Pro",sans-serif';
+  g.textAlign='right';g.textBaseline='top';g.fillText('J theo vòng lặp',PL.w-12,2);
+}
+
+/* ===================== ĐIỀU KHIỂN ===================== */
+function once(){ step(); render(); }
+function toEpoch(){
+  stop();var guard=0;
+  do{ if(!step())break; guard++; }while(VM.node!=='check'&&guard<400);
+  render();
+}
+function runAll(){
+  stop();var guard=0;
+  while(!VM.done&&guard<12000){step();guard++;}
+  render();
+}
+function tick(){ if(!running)return; if(!step()){render();stop();return;} render();
+  timer=setTimeout(tick,speed); }
+function play(){ if(running||VM.done)return; running=true;$('bRun').textContent='Dừng';$('bRun').classList.add('solid');tick(); }
+function stop(){ running=false; if(timer)clearTimeout(timer); timer=null;
+  var r=$('bRun'); if(r){r.textContent='Chạy';r.classList.remove('solid');} }
+
+$('bStep').addEventListener('click',function(){stop();once();});
+$('bEpoch').addEventListener('click',toEpoch);
+$('bRun').addEventListener('click',function(){running?stop():play();});
+$('bAll').addEventListener('click',runAll);
+$('bReset').addEventListener('click',reset);
+$('selA').addEventListener('change',function(e){
+  alpha=parseFloat(e.target.value);
+  SRC[ALPHA_LINE]='alpha = '+e.target.value;
+  buildCode(); reset();
+});
+$('selS').addEventListener('change',function(e){speed=parseInt(e.target.value,10);});
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='SELECT')return;
+  if(e.key===' '){e.preventDefault();running?stop():play();}
+  else if(e.key==='ArrowRight'){e.preventDefault();stop();once();}
+  else if(e.key==='Enter'){e.preventDefault();toEpoch();}
+  else if(e.key==='r'||e.key==='R'){reset();}
+});
+var rz;window.addEventListener('resize',function(){clearTimeout(rz);rz=setTimeout(function(){drawFit();drawLoss();},90);});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){drawFit();drawLoss();});
+
+$('dl').addEventListener('click',function(ev){
+  ev.preventDefault();
+  var blob=new Blob([SRC.join('\n')+'\n'],{type:'text/x-python;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='linear_regression.py';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+});
+
+$('flow').innerHTML=buildFlow();
+buildCode();
+reset();
+})();
+
+</script>
+</body>
+</html>

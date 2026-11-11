@@ -1,0 +1,12 @@
+{
+  "before_bytes": 81730,
+  "after_bytes": 65204,
+  "reduction_percent": 20.2,
+  "css_before": 27938,
+  "css_after": 13366,
+  "html_before": 12745,
+  "html_after": 8533,
+  "initial_html_nodes": 159,
+  "external_font_requests": 0,
+  "measurement_scope": "Minimal UI snapshot before gateway connectivity fix"
+}

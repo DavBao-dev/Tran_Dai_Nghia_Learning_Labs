@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+*.log
+models/
+*.gguf
+*.incomplete
+node_modules/
+.cache/
+.vercel/
+.env.*
+runtime/
