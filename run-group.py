@@ -78,12 +78,13 @@ try:
     tunnel = launch([exe, 'tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', 'http://127.0.0.1:5180'], 'group-tunnel.log')
     for _ in range(90):
         time.sleep(1)
-        match = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', (RUNTIME/'group-tunnel.log').read_text(encoding='utf-8', errors='replace'))
-        if match:
-            url = match.group()
-            break
+        log = (RUNTIME/'group-tunnel.log').read_text(encoding='utf-8', errors='replace')
+        match = re.search(r'https://[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com', log)
         if tunnel.poll() is not None:
             raise RuntimeError('Tunnel stopped; see group-tunnel.log.')
+        if match and 'Registered tunnel connection' in log:
+            url = match.group()
+            break
     else:
         raise RuntimeError('No tunnel URL after 90 seconds.')
     STATE.write_text(json.dumps({'url': url, 'pid': os.getpid(), 'children': [p.pid for p in children]}), encoding='utf-8')
