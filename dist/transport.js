@@ -16,7 +16,7 @@ window.TDNTransport=(()=>{
   async function json(response){if(!/application\/json/i.test(response.headers.get('content-type')||''))throw failure('NOT_GATEWAY','Địa chỉ này đang phục vụ trang web, không phải gateway AI. Kiểm tra URL /api/chat.');return response.json();}
   async function probe(value,token='',origin=window.location.origin){
     const url=endpoint(value,origin),health=new URL(url);health.pathname=health.pathname.replace(/\/chat$/,'/health');
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
     try{
       const response=await fetch(health,{headers:token?{Authorization:'Bearer '+token}:{},signal:controller.signal,cache:'no-store'});
       if(response.status===401||response.status===403)throw failure('AUTH_REQUIRED','Gateway từ chối truy cập. Kiểm tra mã gateway và origin được phép.');
@@ -25,7 +25,7 @@ window.TDNTransport=(()=>{
       if(!response.ok||data.ready!==true)throw failure('MODEL_NOT_READY',typeof data.error==='string'?data.error:'Gateway đã chạy nhưng model chưa sẵn sàng. Chạy start-local.ps1 hoặc kiểm tra Ollama.');
       if(typeof data.model!=='string'||!data.model)throw failure('NOT_GATEWAY','Phản hồi kiểm tra gateway không hợp lệ.');
       return {url,model:data.model};
-    }catch(error){if(error.code)throw error;throw failure('UNREACHABLE',error.name==='AbortError'?'Gateway không phản hồi trong 8 giây.':'Không kết nối được gateway. Kiểm tra server, HTTPS và cấu hình CORS.');}
+    }catch(error){if(typeof error.code==='string')throw error;throw failure('UNREACHABLE',controller.signal.aborted?'Gateway không phản hồi trong 30 giây. Tunnel có thể đã ngắt; lấy link mới từ máy chủ nhóm.':'Không kết nối được gateway. Kiểm tra Tunnel đang chạy và dùng link nhóm mới nhất.');}
     finally{clearTimeout(timer);}
   }
   async function readChat(response){
