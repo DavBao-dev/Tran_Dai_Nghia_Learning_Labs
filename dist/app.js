@@ -35,6 +35,11 @@ let connectionReady=false,connectionIssue='',connectionVersion=0;
 let chatWaitTimer=null,stopRequested=false;
 let descriptionDirty=true,historyDirty=true,renderedWorkspace=null,renderedMessages=[],messageWindow=40,editorLineCount=1,gutterFrame=0,saveIdleHandle=null;
 try{apiEndpoint=localStorage.getItem('tdn-ai-endpoint')||'';}catch{}
+// Group links carry only a public gateway URL; access codes stay out of URLs/storage.
+try{
+  const shared=new URLSearchParams(location.search).get('groupGateway');
+  if(shared){const u=new URL(shared);if(u.protocol==='https:'&&u.hostname.endsWith('.trycloudflare.com')&&!u.username&&!u.password&&!u.port&&!u.search&&!u.hash&&u.pathname==='/api/chat')apiEndpoint=u.href;}
+}catch{}
 if(window.location.protocol==='http:'&&['127.0.0.1','localhost'].includes(window.location.hostname)){
   const port=new URLSearchParams(window.location.search).get('gatewayPort');
   if(port&&/^\d{1,5}$/.test(port)&&Number(port)>0&&Number(port)<65536){apiEndpoint='http://127.0.0.1:'+Number(port)+'/api/chat';try{localStorage.setItem('tdn-ai-endpoint',apiEndpoint);}catch{}}
