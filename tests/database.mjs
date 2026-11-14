@@ -25,7 +25,7 @@ await as(1);await db.exec("insert into sessions values(1,'Python');insert into l
 await as(4);assert.equal((await db.query('select * from lessons')).rows.length,1);assert.equal((await db.query("update lessons set hidden=false where id='b'")).affectedRows,0);
 await db.exec('reset role;set role anon');await fail('select * from workspaces',[],/permission denied/);
 const start=performance.now();
-for(let n=4;n<23;n++){await as(n);await save('session-test',{files:{'main.py':'print('+n+')'}});const r=await db.query('select * from workspaces');assert.equal(r.rows.length,1);assert.equal(r.rows[0].user_id,id(n));}
+for(const n of [1,...Array.from({length:19},(_,i)=>i+4)]){await as(n);await save('session-test',{files:{'main.py':'print('+n+')'}});const r=await db.query('select * from workspaces');assert.equal(r.rows.length,1);assert.equal(r.rows[0].user_id,id(n));}
 console.log('PASS PostgreSQL RLS: isolation, pending/blocked, no role escalation, hidden resources, RPC revision and quota.');
-console.log('19 account write/read cycles (local WASM database, not hosted load test):',Math.round(performance.now()-start),'ms');
+console.log('20 account write/read cycles (local WASM database, not hosted load test):',Math.round(performance.now()-start),'ms');
 await db.close();
