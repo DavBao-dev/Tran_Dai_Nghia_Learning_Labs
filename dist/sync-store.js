@@ -15,6 +15,7 @@ export class Draft {
  async open(){
   try{const local=await readCache(this.key);if(local)this.entry=local;}catch{this.status('Không đọc được cache; hãy giữ bản xuất riêng.');}
   if(!active())return this.entry.payload;
+  if(globalThis.navigator?.onLine===false){this.status('Đang lưu trên máy · Chờ kết nối mạng');return this.entry.payload;}
   try{
    const {data,error}=await auth.client.from('workspaces').select('payload,revision').eq('user_id',this.user).eq('scope',this.scope).eq('item_id',this.item).maybeSingle();if(error)throw error;
    if(this.entry.dirty){if((data?.revision||0)!==this.entry.revision){this.conflict=data||{payload:{},revision:0};this.status('Xung đột · Chọn bản cần giữ');}else this.status('Bản trên máy chưa đồng bộ');}

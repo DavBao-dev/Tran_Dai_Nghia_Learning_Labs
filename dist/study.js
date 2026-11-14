@@ -3,6 +3,7 @@ import {Draft} from './sync-store.js';
 const node=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn)=>{const b=node('button',label,'button');b.type='button';b.onclick=fn;return b;};
 let root,request,draft,selected=null,currentPayload={},generation=0,page=0,query='',mounted=false,searchTimer;
+const sessionPages=new Map();
 let list,viewer,editor,notes,link,complete,status,conflicts,resources,resourcePage=0,cells,assist,mode,rightPane,chooser;
 function report(text){status.textContent=text;conflicts.hidden=!draft?.conflict;}
 function snapshot(){return {files:{[mode.value==='notebook'?'notebook.ipynb':'main.py']:mode.value==='notebook'?JSON.stringify({nbformat:4,nbformat_minor:5,metadata:{kernelspec:{name:'python3',display_name:'Python 3',language:'python'}},cells:cells.map(c=>({cell_type:c.kind,metadata:{},source:c.text,...(c.kind==='code'?{outputs:[],execution_count:null}:{})}))}):cells[0]?.text||''},notes:notes.value,notebookUrl:link.value,completed:complete.checked};}
@@ -32,10 +33,15 @@ function drawCells(){
  });
 }
 async function sessions(){
- const version=generation;list.textContent='Đang tải…';
+ const version=generation,key=JSON.stringify([auth.user.id,page,query]),cached=sessionPages.get(key);
+ if(cached&&Date.now()-cached.at<60000){drawSessions(cached.data,cached.count);return;}
+ list.textContent='Đang tải…';
  let q=auth.client.from('sessions').select('*',{count:'exact'}).order('id').range(page*30,page*30+29).abortSignal(request.signal);
  if(query)q=/^\d+$/.test(query.trim())?q.eq('id',Number(query)):q.ilike('title','%'+query.replace(/[%_*(),.]/g,'').slice(0,80)+'%');
  const {data,error,count}=await q;if(version!==generation||!mounted)return;if(error){list.textContent=error.message;return;}
+ if(sessionPages.size>=20)sessionPages.delete(sessionPages.keys().next().value);sessionPages.set(key,{data,count,at:Date.now()});drawSessions(data,count);
+}
+function drawSessions(data,count){
  list.replaceChildren();for(const row of data)list.append(button(`Buổi ${row.id} · ${row.title}`,()=>void select(row).catch(e=>report(e.message))));
  list.append(button('←',()=>{if(page){page--;void sessions();}}),node('span',` ${page+1} / ${Math.max(1,Math.ceil(count/30))} `),button('→',()=>{if((page+1)*30<count){page++;void sessions();}}),button('Tài liệu chưa phân loại',()=>void select({id:0,title:'Chưa phân loại'}).catch(e=>report(e.message))));
 }
@@ -63,8 +69,8 @@ function download(){const p=snapshot(),filename=Object.keys(p.files)[0],blob=new
 export async function mount(container){
  root=container;await init();root.replaceChildren();if(!active()){root.append(node('h2','Vừa Học Vừa Code'),node('p',!auth.configured?'Chưa cấu hình tài khoản. Gallery và Learning Lab vẫn dùng được.':auth.user?'Tài khoản cần được admin duyệt để mở khu vực này.':'Đăng nhập Google ở thanh đầu trang để lưu bài làm và học cùng code.'));return;}
  mounted=true;generation++;request=new AbortController();await import('./notebook-core.js');if(!mounted)return;
- const toolbar=node('div','','study-tools'),search=document.createElement('input');search.placeholder='Tìm trong syllabus';search.oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{query=search.value;page=0;chooser.open=true;void sessions();},200);};
- toolbar.append(search,button('Tải lại danh sách',()=>void sessions()));
+ const toolbar=node('div','','study-tools'),search=document.createElement('input');search.value=query;search.placeholder='Tìm trong syllabus';search.oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{query=search.value;page=0;chooser.open=true;void sessions();},200);};
+ toolbar.append(search,button('Tải lại danh sách',()=>{sessionPages.clear();void sessions();if(selected)void loadResources();}));
  const syllabus=node('a','Syllabus ↗','button');syllabus.href='https://docs.google.com/spreadsheets/d/1DubppuvJggRWD8GDYrZy6DakNv4VfeQw5oM2k1YJxnY/edit';syllabus.target='_blank';syllabus.rel='noopener noreferrer';toolbar.append(syllabus);
  const mobile=node('div','','study-mobile');mobile.append(button('Học liệu',()=>root.dataset.panel='lesson'),button('Code',()=>root.dataset.panel='code'));root.dataset.panel='lesson';
  const layout=node('div','','study-layout'),left=node('section','','study-left'),right=node('section','','study-right'),divider=node('div','','study-divider');divider.setAttribute('role','separator');divider.setAttribute('aria-label','Đổi độ rộng hai khung');divider.tabIndex=0;
