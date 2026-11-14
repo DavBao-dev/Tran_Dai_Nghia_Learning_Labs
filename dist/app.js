@@ -1,7 +1,7 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const KEY = 'tdn-ai-workspace-v2';
+const KEY = window.TDNAccount?.user?.id?'tdn-ai-workspace-v2:'+window.TDNAccount.user.id:'tdn-ai-workspace-v2';
 const catalog = [...window.TDN_PROBLEMS];
 const emptyWork = p => ({files:{...p.files},activeFile:'notebook.ipynb',messages:[],submissions:[]});
 let database={current:'sentiment',workspaces:{},customProblems:[]}, storageAvailable=true;
@@ -23,7 +23,7 @@ try{
     if(saved.workspaces&&typeof saved.workspaces==='object')for(const p of catalog){if(Object.hasOwn(saved.workspaces,p.id))database.workspaces[p.id]=cleanWork(saved.workspaces[p.id],p);}
     if(catalog.some(p=>p.id===saved.current))database.current=saved.current;
   }else{
-    const legacy=JSON.parse(localStorage.getItem('tdn-ai-workspace-v1'));
+    const legacy=window.TDNAccount?.user?null:JSON.parse(localStorage.getItem('tdn-ai-workspace-v1'));
     if(legacy)database.workspaces.sentiment=cleanWork(legacy,catalog[0]);
   }
 }catch{storageAvailable=false;}
@@ -46,7 +46,7 @@ if(window.location.protocol==='http:'&&['127.0.0.1','localhost'].includes(window
 }
 function validName(name){return typeof name==='string' && name.length<=100 && /^[\p{L}\p{N}_. /-]+$/u.test(name) && !name.startsWith('/') && !name.endsWith('/') && !name.includes('//') && !name.split('/').some(p=>['.','..','__proto__','constructor','prototype'].includes(p));}
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),3200);}
-function persist(){clearTimeout(saveTimer);if(saveIdleHandle!==null&&window.cancelIdleCallback){window.cancelIdleCallback(saveIdleHandle);saveIdleHandle=null;}try{localStorage.setItem(KEY,JSON.stringify(database));storageAvailable=true;$('.saved').lastChild.textContent=' Đã lưu trên máy';}catch{storageAvailable=false;$('.saved').lastChild.textContent=' Chưa lưu · Hãy tải dự án';toast('Bộ nhớ trình duyệt không khả dụng hoặc đã đầy. Hãy tải dự án để giữ thay đổi.');}}
+function persist(){window.dispatchEvent(new Event('tdn-exam-dirty'));clearTimeout(saveTimer);if(saveIdleHandle!==null&&window.cancelIdleCallback){window.cancelIdleCallback(saveIdleHandle);saveIdleHandle=null;}try{localStorage.setItem(KEY,JSON.stringify(database));storageAvailable=true;$('.saved').lastChild.textContent=' Đã lưu trên máy';}catch{storageAvailable=false;$('.saved').lastChild.textContent=' Chưa lưu · Hãy tải dự án';toast('Bộ nhớ trình duyệt không khả dụng hoặc đã đầy. Hãy tải dự án để giữ thay đổi.');}}
 function schedulePersist(){
   clearTimeout(saveTimer);if(saveIdleHandle!==null&&window.cancelIdleCallback){window.cancelIdleCallback(saveIdleHandle);saveIdleHandle=null;}
   saveTimer=setTimeout(()=>{const save=()=>{saveIdleHandle=null;persist();$('#dirty').style.opacity='0';};if(window.requestIdleCallback)saveIdleHandle=window.requestIdleCallback(save,{timeout:2000});else save();},800);
@@ -264,7 +264,7 @@ function switchProblem(id){
   const problem=catalog.find(p=>p.id===id);if(!problem)return;
   clearTimeout(saveTimer);state.files[state.activeFile]=$('#codeEditor').value;persist();
   conversation++;endChatWaiting();requestController?.abort();busy=false;updateSendButton();$('#prompt').value='';context=null;$('#contextChip').hidden=true;collapsed.clear();
-  currentProblem=problem;database.current=id;state=database.workspaces[id]??=emptyWork(problem);
+  currentProblem=problem;database.current=id;state=database.workspaces[id]??=emptyWork(problem);window.dispatchEvent(new Event('tdn-exam-selected'));
   $('#submissionFeedback').replaceChildren();$('#submissionFeedback').className='';
   $('#editorFilename').textContent=state.activeFile.split('/').pop();$('#editorPath').textContent=id+' / '+state.activeFile;$('#fileLanguage').textContent=fileType(state.activeFile)[1];$('#codeEditor').value=state.files[state.activeFile];messageWindow=40;historyDirty=true;updateLines();window.TDNNotebookUI.open();renderTree();renderMessages();renderProblem();persist();showTab('description');void loadDescription().catch(()=>{});$('#catalogDialog').close();
 }
@@ -287,3 +287,5 @@ $('#exportProblemTemplate').onclick=()=>{const template={...window.TDN_PROBLEMS[
 $('#editorFilename').textContent=state.activeFile.split('/').pop();$('#editorPath').textContent=currentProblem.id+' / '+state.activeFile;$('#codeEditor').value=state.files[state.activeFile];$('#fileLanguage').textContent=fileType(state.activeFile)[1];updateLines();window.TDNNotebookUI.open();renderTree();renderMessages();renderProblem();showTab('code');void loadDescription().catch(()=>{});
 if(!storageAvailable){$('.saved').lastChild.textContent=' Chưa lưu · Hãy tải dự án';}
 
+
+window.TDNExam={id:()=>currentProblem.id,lock:busy=>{document.body.inert=busy;},payload:()=>({files:Object.fromEntries(Object.entries(state.files).filter(([n,v])=>v!==currentProblem.files[n])),deletedFiles:Object.keys(currentProblem.files).filter(n=>!Object.hasOwn(state.files,n)),activeFile:state.activeFile}),apply:p=>{const files={...currentProblem.files,...p.files};for(const name of p.deletedFiles||[])delete files[name];const clean=cleanWork({files,activeFile:p.activeFile},currentProblem);state.files=clean.files;state.activeFile=clean.activeFile;descriptionDirty=true;renderTree();openFile(state.activeFile,true);}};

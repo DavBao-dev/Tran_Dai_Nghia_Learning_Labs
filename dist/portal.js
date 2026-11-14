@@ -1,3 +1,5 @@
+import {ready as accountReady} from './account-ui.js';
+let studyModule;
 const $=s=>document.querySelector(s);
 const local=['127.0.0.1','localhost'].includes(location.hostname)&&location.protocol==='http:';
 const params=new URLSearchParams(location.search),port=params.get('gatewayPort');
@@ -61,11 +63,13 @@ function renderGallery(){
  $('#count').textContent=list.length+' tài liệu';$('#pageCount').textContent=(page+1)+' / '+pages;$('#prev').disabled=page===0;$('#next').disabled=page===pages-1;
 }
 async function switchView(next){
- if(!['exam','lab','gallery'].includes(next))next='gallery';view=next;
+ if(!['exam','lab','gallery','study'].includes(next))next='gallery';view=next;
  document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!==next);document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===next)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+ if(next!=='study')studyModule?.unmount();
  if(next!=='lab'){labModule?.pause?.();stopTorch();}
  if(next==='exam'&&!examFrame){examFrame=document.createElement('iframe');examFrame.title='Môi trường thi AI';examFrame.src='exam.html'+location.search;$('#examMount').append(examFrame);}
  try{
+  if(next==='study'){await accountReady;if(view!=='study')return;studyModule=await import('./study.js');if(view==='study')await studyModule.mount($('#studyMount'));}
   if(next==='gallery'){await loadCatalog();if(view!=='gallery')return;renderGallery();void refreshCustom();}
   if(next==='lab'){startTorch();await loadCatalog();if(view!=='lab')return;$('#labResources').replaceChildren(...built.filter(i=>i.kind==='html'&&/cnn_interactive|gan_interactive|transformer|chain-rule|linear-regression-pytorch|decision tree classification/.test(i.originalName)).map(card));}
  }catch(e){notice(e.message);}

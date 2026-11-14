@@ -1,5 +1,11 @@
 # THPT Chuyên Trần Đại Nghĩa · AI Workspace
 
+## Tài khoản và Vừa Học Vừa Code · 14/11/2026
+
+Đã thêm Google login qua Supabase, thành viên chờ admin duyệt, quản trị học liệu, cache IndexedDB theo tài khoản và đồng bộ code/tiến độ bằng RPC có kiểm tra revision/quota. Tab học dùng syllabus 305 buổi, phát Drive preview bên trái, editor Python/notebook và link Colab/Kaggle riêng bên phải. Không tải video về server. Dữ liệu Drive seed nằm ngoài repo; database áp dụng RLS, khách chưa đăng nhập không đọc được danh mục học riêng.
+
+Xem [ACCOUNTS-SETUP.md](ACCOUNTS-SETUP.md) để cấu hình Google OAuth, database và admin đầu tiên. `npm test` kiểm thử PostgreSQL RLS, offline/conflict/account isolation và UI DOM; Google OAuth thật và tải hosted cần được kiểm tra sau khi cấu hình dịch vụ.
+
 Ba khu vực: **Môi trường thi**, **Learning Lab**, **Learning Gallery**. Môi trường thi giữ bốn tab Code, Chat AI, Description, Submission – Ranking và dữ liệu đã lưu trước đó. Frontend HTML/CSS/JavaScript không cần build, kèm gateway Python gọi model trên Ollama.
 
 ## Learning Space · cập nhật 11/11/2026

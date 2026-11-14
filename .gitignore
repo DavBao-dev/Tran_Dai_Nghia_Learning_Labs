@@ -10,3 +10,4 @@ node_modules/
 .vercel/
 .env.*
 runtime/
+private-seed/

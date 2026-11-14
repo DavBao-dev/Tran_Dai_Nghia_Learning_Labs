@@ -5,3 +5,7 @@ __pycache__
 *.gguf
 *.log
 .env*
+private-seed
+tests
+supabase
+tools

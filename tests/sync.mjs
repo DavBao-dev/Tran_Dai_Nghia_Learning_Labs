@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import 'fake-indexeddb/auto';
+globalThis.window=new EventTarget();const values=new Map();globalThis.localStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
+const {auth}=await import('../dist/cloud.js');const {Draft,cleanPayload}=await import('../dist/sync-store.js');
+const data=new Map();let offline=false,delay=null;
+auth.user={id:'alice'};auth.member={status:'active'};
+auth.client={from:()=>{const filters={};const q={select:()=>q,eq:(k,v)=>{filters[k]=v;return q;},maybeSingle:async()=>{if(offline)return {error:{message:'Offline'}};return {data:structuredClone(data.get(`${filters.user_id}:${filters.scope}:${filters.item_id}`)||null)};}};return q;},rpc:async(_,args)=>{
+ if(offline)return {error:{message:'Offline'}};
+ if(delay)await delay;
+ const key=`${auth.user.id}:${args.p_scope}:${args.p_item}`,old=data.get(key);if((old?.revision||0)!==args.p_revision)return {error:{message:'REVISION_CONFLICT'}};
+ const row={payload:structuredClone(args.p_payload),revision:(old?.revision||0)+1};data.set(key,row);return {data:row};
+}};
+const sample={files:{'notebook.ipynb':JSON.stringify({nbformat:4,cells:[{cell_type:'code',source:'print(42)',outputs:[{text:'private output'}],execution_count:8}]})},messages:[{text:'private chat'}],notes:'a'};
+const clean=cleanPayload(sample);assert(!clean.messages);assert.deepEqual(JSON.parse(clean.files['notebook.ipynb']).cells[0].outputs,[]);
+const a=new Draft('lesson','1');await a.open();a.change(sample);await a.flush();assert.equal(a.entry.revision,1);assert(!a.entry.dirty);
+const b=new Draft('lesson','1');await b.open();assert.equal(b.entry.payload.notes,'a');
+a.change({...sample,notes:'remote newer'});await a.flush();b.change({...sample,notes:'local conflict'});await b.flush();assert(b.conflict);assert.equal(b.entry.payload.notes,'local conflict');
+b.resolve(false);await b.cached;assert.equal(b.entry.payload.notes,'remote newer');const cacheDB=await new Promise(resolve=>{const r=indexedDB.open('tdn-account-drafts');r.onsuccess=()=>resolve(r.result);});const cacheKeys=await new Promise(resolve=>{const r=cacheDB.transaction('drafts').objectStore('drafts').getAllKeys();r.onsuccess=()=>resolve(r.result);});assert(cacheKeys.some(k=>k.includes(':conflict:')));cacheDB.close();
+offline=true;a.change({...sample,notes:'offline edit'});await a.flush();assert(a.entry.dirty);a.close();
+const c=new Draft('lesson','1');await c.open();assert.equal(c.entry.payload.notes,'offline edit');offline=false;await c.flush();assert(!c.entry.dirty);
+let release;delay=new Promise(r=>release=r);c.change({...sample,notes:'in flight'});const saving=c.flush();c.change({...sample,notes:'new typing'});release();await saving;delay=null;assert(c.entry.dirty);await c.flush();assert.equal(data.get('alice:lesson:1').payload.notes,'new typing');
+auth.user={id:'bob'};const other=new Draft('lesson','1');await other.open();assert.deepEqual(other.entry.payload,{});assert.notEqual(other.key,c.key);
+for(const d of [b,c,other])d.close();console.log('PASS: output/chat stripping, offline replay, revision conflicts/backups, edits during save and account cache separation.');

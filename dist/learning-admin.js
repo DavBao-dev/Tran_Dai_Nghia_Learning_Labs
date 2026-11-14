@@ -1,0 +1,22 @@
+import {auth,admin} from './cloud.js';
+const make=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n;};
+export async function mountAdmin(root){
+ if(!admin())throw Error('Cần quyền admin.');
+ root.replaceChildren(make('h2','Quản lý nhóm'));const status=make('p','');root.append(status);
+ const run=async(fn)=>{try{await fn();}catch(e){status.textContent=e.message;}};
+ const button=(text,fn)=>{const b=make('button',text);b.className='button';b.onclick=()=>run(fn);root.append(b);return b;};
+ button('Đóng',()=>root.close());
+ const members=make('div','');root.append(members);
+ const listMembers=async()=>{members.replaceChildren();const {data,error}=await auth.client.from('members').select('*').order('created_at').limit(100);if(error)throw error;for(const m of data){const row=make('div',`${m.email} · ${m.status} `);for(const [s,t] of [['active','Duyệt'],['blocked','Khóa']]){const b=make('button',t);b.disabled=m.role==='admin';b.onclick=()=>run(async()=>{const {error}=await auth.client.rpc('set_member_status',{member_id:m.id,new_status:s});if(error)throw error;await listMembers();});row.append(b);}members.append(row);}};
+ button('Tải thành viên',listMembers);await listMembers();
+ root.append(make('h3','Nhập / cập nhật danh mục Drive và syllabus'));
+ root.append(make('p','Chọn drive-catalog.json và syllabus.json do công cụ lập danh mục tạo. File Drive giữ nguyên quyền chia sẻ.'));
+ const input=document.createElement('input');input.type='file';input.accept='.json';input.multiple=true;root.append(input);
+ button('Nhập danh mục',async()=>{for(const f of input.files){const obj=JSON.parse(await f.text());if(obj.rows){const rows=obj.rows.filter(r=>Number(r[0])>0).map(r=>({id:Number(r[0]),title:String(r[2]||'Buổi '+r[0]).slice(0,300)}));const {error}=await auth.client.from('sessions').upsert(rows);if(error)throw error;}else if(obj.items){const items=obj.items.filter(x=>!x.mime?.endsWith('folder')).map(x=>({id:x.id,drive_id:x.id,title:x.title.slice(0,300),mime:x.mime,folder:x.folder||'',session_no:x.session_no||null,sort_order:x.sort_order||10000}));for(let i=0;i<items.length;i+=100){const {error}=await auth.client.from('lessons').upsert(items.slice(i,i+100),{onConflict:'id'});if(error)throw error;status.textContent=`Đã nhập ${Math.min(i+100,items.length)}/${items.length}`;}}else throw Error('File danh mục không hợp lệ.');}status.textContent='Nhập xong. Tải lại danh sách bài học để thấy thay đổi.';});
+ root.append(make('h3','Sửa / thêm / ẩn tài liệu'));
+ const search=document.createElement('input');search.placeholder='Tìm tên tài liệu';root.append(search);const results=make('div','');root.append(results);
+ button('Tìm tài liệu',async()=>{const term=search.value.replace(/[%_*(),.]/g,'').slice(0,80);const {data,error}=await auth.client.from('lessons').select('*').ilike('title','%'+term+'%').order('sort_order').limit(30);if(error)throw error;results.replaceChildren();for(const item of data){const b=make('button',item.title+(item.hidden?' · Đã ẩn':''));b.onclick=()=>edit(item);results.append(b);}});
+ function edit(item={id:'',drive_id:'',title:'',mime:'application/pdf',session_no:null,folder:'',sort_order:10000,hidden:false}){
+ const form=document.createElement('form');form.className='admin-resource';for(const field of ['drive_id','title','mime','session_no','sort_order']){const label=make('label',field);const input=document.createElement('input');input.name=field;input.value=item[field]??'';input.required=['drive_id','title','mime'].includes(field);label.append(input);form.append(label);}const hidden=document.createElement('input');hidden.type='checkbox';hidden.checked=item.hidden;const label=make('label','Ẩn tài liệu');label.append(hidden);form.append(label);const save=make('button','Lưu tài liệu');save.type='submit';form.append(save);form.onsubmit=e=>{e.preventDefault();void run(async()=>{const fields=Object.fromEntries(new FormData(form));if(!/^[\w-]+$/.test(fields.drive_id))throw Error('Drive ID không hợp lệ.');const row={...item,...fields,id:item.id||fields.drive_id,session_no:fields.session_no?Number(fields.session_no):null,sort_order:Number(fields.sort_order)||10000,hidden:hidden.checked,updated_at:new Date().toISOString()};const {error}=await auth.client.from('lessons').upsert(row);if(error)throw error;status.textContent='Đã lưu tài liệu.';form.remove();});};root.querySelector('.admin-resource')?.remove();root.append(form);
+ }button('Thêm tài liệu',()=>edit());
+};

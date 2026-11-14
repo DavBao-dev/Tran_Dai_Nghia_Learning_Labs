@@ -1,0 +1,19 @@
+{
+  "name": "tdn-learning-space",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:cloud": "node tools/bundle-cloud.mjs",
+    "test:db": "node tests/database.mjs",
+    "test": "node tests/database.mjs && node tests/sync.mjs && node tests/study-dom.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "@electric-sql/pglite": "0.5.16",
+    "happy-dom": "21.0.4",
+    "fake-indexeddb": "6.2.8"
+  }
+}
