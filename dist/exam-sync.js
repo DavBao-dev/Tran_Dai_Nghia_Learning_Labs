@@ -4,14 +4,15 @@ if(active()){
  const api=window.TDNExam,bar=document.createElement('div');bar.className='exam-cloud';bar.style.cssText='padding:8px;display:flex;gap:8px;align-items:center;background:#172233;color:#c8d7ee;font-size:12px';
  const status=document.createElement('span');status.textContent='Đang mở bài làm cloud…';bar.append(status);
  const button=(label,fn)=>{const b=document.createElement('button');b.textContent=label;b.onclick=fn;bar.append(b);return b;};
- document.body.prepend(bar);let draft,ticket=0,loading=false;
+ bar.style.flexShrink='0';bar.style.flexWrap='wrap';document.querySelector('main').prepend(bar);let draft,ticket=0,loading=false;
  const completed=document.createElement('input');completed.type='checkbox';const completeLabel=document.createElement('label');completeLabel.textContent='Hoàn thành ';completeLabel.append(completed);bar.append(completeLabel);
  const payload=()=>({...api.payload(),completed:completed.checked});
  completed.onchange=()=>window.dispatchEvent(new Event('tdn-exam-dirty'));
  const conflicts=document.createElement('span');conflicts.hidden=true;
  const apply=p=>{const was=loading;loading=true;completed.checked=!!p.completed;api.apply(p);last=JSON.stringify(payload());loading=was;};
- const local=button('Giữ bản máy',()=>{apply(draft.resolve(true));conflicts.hidden=true;});
- const remote=button('Dùng bản cloud',()=>{apply(draft.resolve(false));conflicts.hidden=true;});
+ const resolve=async local=>{try{apply(await draft.resolve(local));conflicts.hidden=true;}catch(e){report('Không lưu được bản xung đột · Hãy xuất file trước: '+e.message);}};
+ const local=button('Giữ bản máy',()=>void resolve(true));
+ const remote=button('Dùng bản cloud',()=>void resolve(false));
  bar.append(conflicts);conflicts.append(local,remote);
  let last='';
  const report=text=>{status.textContent=text;conflicts.hidden=!draft?.conflict;};

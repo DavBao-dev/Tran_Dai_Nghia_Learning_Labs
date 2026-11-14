@@ -39,6 +39,6 @@ export class Draft {
   }else this.status('Đang lưu trên máy · '+e.message);}
   finally{this.saving=null;if(this.entry.dirty&&!this.conflict&&!this.closed&&seq!==this.entry.seq)this.timer=setTimeout(()=>void this.flush(),2000);}})();return this.saving;
  }
- resolve(useLocal){if(!this.conflict)return;void writeCache(this.key+':conflict:'+Date.now(),structuredClone(this.entry)).catch(()=>this.status('Không lưu được bản xung đột; hãy xuất file.'));const remote=this.conflict;this.conflict=null;this.entry.revision=remote.revision;if(!useLocal){this.entry.payload=remote.payload;this.entry.dirty=false;}this.checkpoint();if(useLocal)void this.flush();return this.entry.payload;}
+ async resolve(useLocal){if(!this.conflict)return;await writeCache(this.key+':conflict:'+Date.now(),structuredClone(this.entry));const remote=this.conflict;this.conflict=null;this.entry.revision=remote.revision;if(!useLocal){this.entry.payload=remote.payload;this.entry.dirty=false;}await this.checkpoint();if(useLocal)void this.flush();return this.entry.payload;}
  close(){clearTimeout(this.timer);this.checkpoint();this.closed=true;window.removeEventListener('online',this.online);}
 }
