@@ -5,7 +5,9 @@
   "scripts": {
     "build:cloud": "node tools/bundle-cloud.mjs",
     "test:db": "node tests/database.mjs",
-    "test": "node tests/database.mjs && node tests/sync.mjs && node tests/study-dom.mjs"
+    "test": "node tests/database.mjs && node tests/sync.mjs && node tests/study-dom.mjs",
+    "test:exam": "node tests/exam-kit.mjs && node tests/exam-local-dom.mjs",
+    "test:jupyter": "python tests/jupyter_local.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0"

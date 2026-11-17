@@ -1,5 +1,13 @@
 # THPT Chuyên Trần Đại Nghĩa · AI Workspace
 
+## Môi trường thi JupyterLab local · 17/11/2026
+
+Tab Môi trường thi cung cấp ZIP của từng đề, gồm description.md, notebook.ipynb, dataset, baseline và launcher JupyterLab thật. Giải nén rồi chạy Mo-JupyterLab.cmd trên Windows, hoặc python3 start-jupyterlab.py trên macOS/Linux. Python 3.10+ được yêu cầu. Launcher dùng Python hiện tại nếu đủ thư viện; nếu thiếu sẽ tạo venv dùng chung giữa các đề trong LOCALAPPDATA/TDN-JupyterLab (hoặc ~/.cache/TDN-JupyterLab), không cài đè global Python.
+
+JupyterLab chỉ bind 127.0.0.1, giữ token và lưu file trong thư mục giải nén. root_dir không phải sandbox. Không có Jupyter server chạy trên Vercel hoặc dùng chung máy chủ cho nhóm. Bài làm local không tự đồng bộ; website có nút sao lưu notebook lên tài khoản và tải ZIP bài cloud. Chat/Description/Submission và bài làm web cũ vẫn mở được qua liên kết riêng.
+
+Kiểm thử bộ đề: node tests/exam-kit.mjs; kiểm thử JupyterLab/kernel thật (cần đủ thư viện local): python tests/jupyter_local.py.
+
 ## Tài khoản và Vừa Học Vừa Code · 14/11/2026
 
 Đã thêm Google login qua Supabase, thành viên chờ admin duyệt, quản trị học liệu, cache IndexedDB theo tài khoản và đồng bộ code/tiến độ bằng RPC có kiểm tra revision/quota. Tab học dùng syllabus 305 buổi, phát Drive preview bên trái, editor Python/notebook và link Colab/Kaggle riêng bên phải. Không tải video về server. Dữ liệu Drive seed nằm ngoài repo; database áp dụng RLS, khách chưa đăng nhập không đọc được danh mục học riêng.

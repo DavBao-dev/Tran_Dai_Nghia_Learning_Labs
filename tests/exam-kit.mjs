@@ -1,0 +1,8 @@
+import fs from 'node:fs/promises';import vm from 'node:vm';import assert from 'node:assert/strict';import {zipFiles,problemFiles} from '../dist/exam-kit.js';
+globalThis.window={};vm.runInThisContext(await fs.readFile(new URL('../dist/notebook-core.js',import.meta.url),'utf8'));vm.runInThisContext(await fs.readFile(new URL('../dist/problems.js',import.meta.url),'utf8'));
+const runtime=Object.fromEntries(await Promise.all(['start-jupyterlab.py','Mo-JupyterLab.cmd','requirements-jupyterlab.txt','HUONG-DAN.md'].map(async f=>[f,await fs.readFile(new URL('../dist/jupyter-kit/'+f,import.meta.url),'utf8')])));
+const p=window.TDN_PROBLEMS[0],files=problemFiles(p,{files:{'notebook.ipynb':'saved-notebook','../escape.py':'bad','START-JUPYTERLAB.PY':'bad','start-jupyterlab.py ':'bad','sitecustomize.py':'bad','NUL.txt':'bad'}},runtime);
+assert.equal(files['notebook.ipynb'],'saved-notebook');assert.equal(files['start-jupyterlab.py'],runtime['start-jupyterlab.py']);for(const f of ['../escape.py','START-JUPYTERLAB.PY','start-jupyterlab.py ','sitecustomize.py','NUL.txt'])assert(!Object.hasOwn(files,f));
+const folder=new URL('../.cache/jupyter-kits/',import.meta.url);await fs.mkdir(folder,{recursive:true});
+for(const p of window.TDN_PROBLEMS){const files=problemFiles(p,{},runtime),n=JSON.parse(files['notebook.ipynb']);assert(n.cells.length>0);assert(files['description.md'].includes(p.title));assert(files['data/train.csv']);const blob=zipFiles(files);await fs.writeFile(new URL(p.id+'.zip',folder),Buffer.from(await blob.arrayBuffer()));}
+console.log('PASS: 5 real notebook/data/description/launcher ZIPs; cloud overlays cannot replace launchers or escape archive paths.');
